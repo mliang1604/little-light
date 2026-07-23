@@ -47,11 +47,11 @@ Bungie API keys and public-client ids are not secrets (they ship in the JS bundl
 
 ```bash
 npm install
-npm start          # http://localhost:4200 — player search works
-npm run start:ssl  # https://localhost:4200 — required to test OAuth sign-in
+npm start          # https://localhost:4200 — accept the self-signed certificate once
+npm run start:http # http variant — UI only; Bungie rejects its Origin (error 2107)
 ```
 
-Bungie requires an `https` redirect URL, so use `start:ssl` (accept the self-signed-certificate warning once) when testing sign-in locally.
+Bungie rejects any request whose `Origin` doesn't exactly match the registered `https://localhost:4200` (`OriginHeaderDoesNotMatchKey`), and OAuth redirect URLs must be `https` — so the https dev server is the default.
 
 ## Deployment
 
