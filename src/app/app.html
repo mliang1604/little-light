@@ -1,0 +1,30 @@
+<div class="shell">
+  <header class="masthead">
+    <a routerLink="/" class="brand">
+      <span class="brand-mark" aria-hidden="true">✦</span>
+      <span class="brand-name">Little Light</span>
+    </a>
+    <nav class="nav">
+      <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">Search</a>
+      <a routerLink="/me" routerLinkActive="active">Your Guardian</a>
+      @if (auth.isSignedIn()) {
+        <button type="button" class="link-button" (click)="auth.signOut()">Sign out</button>
+      }
+    </nav>
+  </header>
+
+  @if (!apiConfigured) {
+    <p class="notice">
+      No Bungie API key configured — set <code>bungieApiKey</code> in
+      <code>src/environments/</code>. See the README for setup.
+    </p>
+  }
+
+  <main class="content">
+    <router-outlet />
+  </main>
+
+  <footer class="footer">
+    <p>Not affiliated with Bungie. Data provided by the Bungie.net API.</p>
+  </footer>
+</div>

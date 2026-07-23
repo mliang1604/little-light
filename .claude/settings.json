@@ -1,0 +1,16 @@
+{
+  "extraKnownMarketplaces": {
+    "liangify": {
+      "source": {
+        "source": "github",
+        "repo": "mliang1604/liangify"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "core@liangify": true,
+    "typescript@liangify": true,
+    "angular@liangify": true,
+    "unity@liangify": false
+  }
+}
