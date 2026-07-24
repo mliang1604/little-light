@@ -8,7 +8,7 @@ A lightweight companion app for [Destiny 2](https://www.bungie.net/7/en/Destiny/
 
 - **Player search** — find any player by full Bungie Name (`Guardian#1234`), cross-save aware
 - **Character overview** — class, race, Power level, emblem, and hours played per character
-- **Sign in with Bungie.net** — OAuth (public client) to view your own profile
+- **Sign in with Bungie.net** — OAuth (public client) to view your own profile; if your Bungie profile has multiple Destiny 2 platform accounts (no cross save), a header switcher swaps between them
 - **Inventory** — DIM-style view of your characters' equipped/carried weapons and armor plus the vault, in aligned bucket bands with Power levels, gear-tier pips, and rarity borders. Each character shows their Postmaster (engram slots and lost items) at the top. Click any item for a detail dialog with its stats and equipped perks/mods. Item names and icons come from Bungie's manifest, downloaded once and cached in IndexedDB per game version.
 
 ## Stack

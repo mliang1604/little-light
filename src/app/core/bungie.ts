@@ -154,6 +154,15 @@ export function formatNameCode(code: number | undefined): string {
   return code == null ? '' : `#${String(code).padStart(4, '0')}`;
 }
 
+/** With cross save active only the primary platform account is playable; the rest are shells. */
+export function usableMemberships(
+  memberships: readonly UserInfoCard[],
+): readonly UserInfoCard[] {
+  return memberships.filter(
+    (m) => m.crossSaveOverride === 0 || m.crossSaveOverride === m.membershipType,
+  );
+}
+
 /** Cross-save accounts list one membership per platform; prefer the primary. */
 export function pickPrimaryMembership(
   memberships: readonly UserInfoCard[],

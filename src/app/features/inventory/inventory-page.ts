@@ -1,4 +1,13 @@
-import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  effect,
+  inject,
+  signal,
+  untracked,
+} from '@angular/core';
+import { AccountService } from '../../core/account.service';
 import { AuthService } from '../../core/auth.service';
 import { BungieApiService } from '../../core/bungie-api.service';
 import { ManifestService } from '../../core/manifest.service';
@@ -8,11 +17,12 @@ import {
   buildInventoryView,
   buildItemDetail,
 } from '../../core/inventory';
-import { BUNGIE_ROOT, BungieApiError, CLASS_NAMES, pickPrimaryMembership } from '../../core/bungie';
+import { BUNGIE_ROOT, BungieApiError, CLASS_NAMES } from '../../core/bungie';
 import type {
   DestinyCharacter,
   DestinyFullProfile,
   SocketCategoryInfo,
+  UserInfoCard,
 } from '../../core/bungie';
 import type { InventoryView, ItemDetailView, ItemView } from '../../core/inventory';
 import type { LoadedDefs } from '../../core/manifest.service';
@@ -52,10 +62,10 @@ import { ItemTile } from './item-tile';
           <p class="lede">Processing the item database…</p>
         }
       }
-      @if (loading() && manifest.state().kind === 'ready') {
+      @if (busy() && manifest.state().kind !== 'downloading') {
         <p class="lede">Loading your inventory…</p>
       }
-      @if (error(); as message) {
+      @if (displayError(); as message) {
         <p class="error" role="alert">{{ message }}</p>
       }
       @if (view(); as v) {
@@ -158,8 +168,9 @@ import { ItemTile } from './item-tile';
     }
   `,
 })
-export class InventoryPage implements OnInit {
+export class InventoryPage {
   protected readonly auth = inject(AuthService);
+  protected readonly account = inject(AccountService);
   protected readonly manifest = inject(ManifestService);
   private readonly api = inject(BungieApiService);
 
@@ -174,17 +185,40 @@ export class InventoryPage implements OnInit {
 
   private defs: LoadedDefs | null = null;
   private profileData: DestinyFullProfile | null = null;
+  private loadedId: string | null = null;
+
+  protected readonly busy = computed(() => this.loading() || this.account.loading());
+  protected readonly displayError = computed(() => this.error() ?? this.account.error());
 
   protected readonly downloadedMb = computed(() => {
     const state = this.manifest.state();
     return state.kind === 'downloading' ? state.receivedMb.toFixed(0) : '';
   });
 
-  async ngOnInit(): Promise<void> {
-    if (!this.auth.isSignedIn()) return;
+  constructor() {
+    effect(() => {
+      if (!this.auth.isSignedIn()) return;
+      const membership = this.account.selected();
+      if (!membership) {
+        this.loadedId = null;
+        return;
+      }
+      if (membership.membershipId === this.loadedId) return;
+      this.loadedId = membership.membershipId;
+      untracked(() => void this.load(membership));
+    });
+  }
+
+  private async load(membership: UserInfoCard): Promise<void> {
     this.loading.set(true);
+    this.error.set(null);
+    this.view.set(null);
+    this.selected.set(null);
     try {
-      const [defs, full] = await Promise.all([this.manifest.load(), this.loadProfile()]);
+      const [defs, full] = await Promise.all([
+        this.manifest.load(),
+        this.api.getFullProfile(membership.membershipType, membership.membershipId),
+      ]);
       this.defs = defs;
       this.profileData = full;
       this.view.set(buildInventoryView(full, defs.items));
@@ -226,17 +260,5 @@ export class InventoryPage implements OnInit {
   private manifestErrorMessage(): string {
     const state = this.manifest.state();
     return state.kind === 'error' ? state.message : 'Failed to load the item database.';
-  }
-
-  private async loadProfile(): Promise<DestinyFullProfile> {
-    const memberships = await this.api.getCurrentUserMemberships();
-    const primary = pickPrimaryMembership(
-      memberships.destinyMemberships,
-      memberships.primaryMembershipId,
-    );
-    if (!primary) {
-      throw new BungieApiError('No Destiny 2 accounts are linked to this Bungie.net profile.');
-    }
-    return this.api.getFullProfile(primary.membershipType, primary.membershipId);
   }
 }
