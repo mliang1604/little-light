@@ -34,6 +34,31 @@ export interface DestinyProfile {
   readonly characters: { readonly data?: Readonly<Record<string, DestinyCharacter>> };
 }
 
+export interface DestinyItemComponent {
+  readonly itemHash: number;
+  readonly itemInstanceId?: string;
+  readonly quantity: number;
+  readonly bucketHash: number;
+}
+
+export interface DestinyItemInstance {
+  readonly primaryStat?: { readonly value: number };
+  readonly damageType?: number;
+}
+
+export interface DestinyItemList {
+  readonly items: readonly DestinyItemComponent[];
+}
+
+export interface DestinyFullProfile extends DestinyProfile {
+  readonly profileInventory: { readonly data?: DestinyItemList };
+  readonly characterInventories: { readonly data?: Readonly<Record<string, DestinyItemList>> };
+  readonly characterEquipment: { readonly data?: Readonly<Record<string, DestinyItemList>> };
+  readonly itemComponents: {
+    readonly instances: { readonly data?: Readonly<Record<string, DestinyItemInstance>> };
+  };
+}
+
 export interface CurrentUserMemberships {
   readonly destinyMemberships: readonly UserInfoCard[];
   readonly primaryMembershipId?: string;
@@ -88,9 +113,9 @@ export function parseBungieName(
   const hashIndex = input.lastIndexOf('#');
   if (hashIndex <= 0) return null;
   const displayName = input.slice(0, hashIndex).trim();
-  const code = Number(input.slice(hashIndex + 1).trim());
-  if (!displayName || !Number.isInteger(code) || code < 0) return null;
-  return { displayName, displayNameCode: code };
+  const codeText = input.slice(hashIndex + 1).trim();
+  if (!displayName || !/^\d{1,4}$/.test(codeText)) return null;
+  return { displayName, displayNameCode: Number(codeText) };
 }
 
 export function formatNameCode(code: number | undefined): string {

@@ -6,6 +6,7 @@
     </a>
     <nav class="nav">
       <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">Search</a>
+      <a routerLink="/inventory" routerLinkActive="active">Inventory</a>
       <a routerLink="/me" routerLinkActive="active">Your Guardian</a>
       @if (auth.isSignedIn()) {
         <button type="button" class="link-button" (click)="auth.signOut()">Sign out</button>

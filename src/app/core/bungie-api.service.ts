@@ -6,12 +6,26 @@ import { BUNGIE_API, BungieApiError, parseBungieName, pickPrimaryMembership } fr
 import type {
   BungieEnvelope,
   CurrentUserMemberships,
+  DestinyFullProfile,
   DestinyProfile,
   UserInfoCard,
 } from './bungie';
 
 /** DestinyComponentType values: 100 = Profiles, 200 = Characters. */
 const PROFILE_COMPONENTS = '100,200';
+
+/** Adds 102 ProfileInventories (vault), 201 CharacterInventories, 205 CharacterEquipment, 300 ItemInstances. */
+const INVENTORY_COMPONENTS = '100,102,200,201,205,300';
+
+export interface ManifestInfo {
+  readonly version: string;
+  readonly itemLitePath: string;
+}
+
+interface RawManifestResponse {
+  readonly version: string;
+  readonly jsonWorldComponentContentPaths: Readonly<Record<string, Record<string, string>>>;
+}
 
 @Injectable({ providedIn: 'root' })
 export class BungieApiService {
@@ -39,6 +53,24 @@ export class BungieApiService {
 
   getCurrentUserMemberships(): Promise<CurrentUserMemberships> {
     return this.request<CurrentUserMemberships>('GET', '/User/GetMembershipsForCurrentUser/');
+  }
+
+  /** Full inventory for the signed-in player — needs the ReadDestinyInventoryAndVault scope. */
+  getFullProfile(membershipType: number, membershipId: string): Promise<DestinyFullProfile> {
+    return this.request<DestinyFullProfile>(
+      'GET',
+      `/Destiny2/${membershipType}/Profile/${membershipId}/?components=${INVENTORY_COMPONENTS}`,
+    );
+  }
+
+  async getManifestInfo(): Promise<ManifestInfo> {
+    const manifest = await this.request<RawManifestResponse>('GET', '/Destiny2/Manifest/');
+    const itemLitePath =
+      manifest.jsonWorldComponentContentPaths['en']?.['DestinyInventoryItemLiteDefinition'];
+    if (!itemLitePath) {
+      throw new BungieApiError('Manifest is missing English item definitions.');
+    }
+    return { version: manifest.version, itemLitePath };
   }
 
   private async request<T>(method: 'GET' | 'POST', path: string, body?: unknown): Promise<T> {

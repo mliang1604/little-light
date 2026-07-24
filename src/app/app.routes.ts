@@ -7,6 +7,12 @@ export const routes: Routes = [
     title: 'Little Light — Guardian lookup',
   },
   {
+    path: 'inventory',
+    loadComponent: () =>
+      import('./features/inventory/inventory-page').then((m) => m.InventoryPage),
+    title: 'Little Light — Inventory',
+  },
+  {
     path: 'me',
     loadComponent: () => import('./features/me/me-page').then((m) => m.MePage),
     title: 'Little Light — Your Guardian',
