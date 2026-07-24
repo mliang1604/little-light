@@ -660,16 +660,22 @@ app-item-tile {
   cursor: default;
 }
 
-.tile-sheet-tier {
+.tile-flags {
   position: absolute;
   top: 0;
   right: 0;
+  display: flex;
+  flex-direction: column;
+  background: rgb(8 10 14 / 0.78);
+  border-bottom-left-radius: 6px;
+  text-align: center;
+}
+
+.tile-sheet-tier {
   padding: 0 4px;
   font-size: 10px;
   line-height: 14px;
   font-weight: 700;
-  background: rgb(8 10 14 / 0.78);
-  border-bottom-left-radius: 6px;
   color: #cfd6dd;
 }
 
@@ -690,15 +696,10 @@ app-item-tile {
 }
 
 .tile-god {
-  position: absolute;
-  left: 0;
-  bottom: 0;
-  padding: 0 3px;
+  padding: 0 4px 1px;
   font-size: 10px;
-  line-height: 15px;
+  line-height: 13px;
   color: #f2cd4e;
-  background: rgb(8 10 14 / 0.78);
-  border-top-right-radius: 6px;
 }
 
 /* Rarity via border color only — blurred glows on ~900 vault tiles are a
