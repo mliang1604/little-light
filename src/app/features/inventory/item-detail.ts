@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, inject, input, output, signal } from '@angular/core';
 import { BUNGIE_ROOT } from '../../core/bungie';
 import { BungieApiService } from '../../core/bungie-api.service';
+import { composePlugDescription } from '../../core/inventory';
 import type { ItemDetailView, ItemPlugView } from '../../core/inventory';
 
 /** Viewport-fixed placement computed from the clicked tile's rect. */
@@ -178,7 +179,13 @@ export class ItemDetail {
     let description: string;
     try {
       const extras = await this.api.getItemExtras(plug.hash);
-      description = extras.description || 'No description available.';
+      const sandbox = await Promise.all(
+        extras.perkHashes.map((hash) =>
+          this.api.getSandboxPerkDescription(hash).catch(() => ''),
+        ),
+      );
+      description =
+        composePlugDescription(extras.description, sandbox) || 'No description available.';
     } catch {
       description = 'Could not load the description.';
     }

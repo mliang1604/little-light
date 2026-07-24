@@ -30,14 +30,22 @@ export interface ManifestInfo {
 
 interface RawFullItemDef {
   readonly displayProperties?: { readonly description?: string };
+  readonly perks?: readonly { readonly perkHash: number }[];
   readonly sockets?: {
     readonly socketCategories?: readonly SocketCategoryInfo[];
   };
 }
 
+interface RawSandboxPerkDef {
+  readonly isDisplayable?: boolean;
+  readonly displayProperties?: { readonly description?: string };
+}
+
 /** On-demand pieces of the full item definition that the Lite manifest strips. */
 export interface ItemDefExtras {
   readonly description: string;
+  /** Sandbox perks carry the real effect text for catalysts, mods, and traits. */
+  readonly perkHashes: readonly number[];
   readonly socketCategories: readonly SocketCategoryInfo[];
 }
 
@@ -50,6 +58,7 @@ interface RawManifestResponse {
 export class BungieApiService {
   private readonly http = inject(HttpClient);
   private readonly itemExtrasCache = new Map<number, Promise<ItemDefExtras>>();
+  private readonly sandboxPerkCache = new Map<number, Promise<string>>();
 
   async searchPlayer(bungieName: string): Promise<UserInfoCard | null> {
     const parsed = parseBungieName(bungieName);
@@ -108,6 +117,7 @@ export class BungieApiService {
       )
         .then((def) => ({
           description: def.displayProperties?.description ?? '',
+          perkHashes: (def.perks ?? []).map((perk) => perk.perkHash),
           socketCategories: def.sockets?.socketCategories ?? [],
         }))
         .catch((err: unknown) => {
@@ -115,6 +125,26 @@ export class BungieApiService {
           throw err;
         });
       this.itemExtrasCache.set(itemHash, cached);
+    }
+    return cached;
+  }
+
+  /** Displayable sandbox-perk description, or '' when hidden. Cached per hash. */
+  getSandboxPerkDescription(perkHash: number): Promise<string> {
+    let cached = this.sandboxPerkCache.get(perkHash);
+    if (!cached) {
+      cached = this.request<RawSandboxPerkDef>(
+        'GET',
+        `/Destiny2/Manifest/DestinySandboxPerkDefinition/${perkHash}/`,
+      )
+        .then((def) =>
+          def.isDisplayable === false ? '' : (def.displayProperties?.description ?? ''),
+        )
+        .catch((err: unknown) => {
+          this.sandboxPerkCache.delete(perkHash);
+          throw err;
+        });
+      this.sandboxPerkCache.set(perkHash, cached);
     }
     return cached;
   }
