@@ -209,7 +209,7 @@ export class InventoryPage implements OnInit {
     let categories: readonly SocketCategoryInfo[] = [];
     if (item.instanceId) {
       try {
-        categories = await this.api.getItemSocketCategories(item.itemHash);
+        categories = (await this.api.getItemExtras(item.itemHash)).socketCategories;
       } catch {
         // Without the socket layout, every plug falls back to the mods list.
       }
