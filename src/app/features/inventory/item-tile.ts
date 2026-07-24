@@ -37,14 +37,14 @@ const MAX_GEAR_TIER = 5;
         </span>
       }
       @if (roll(); as r) {
-        @if (r.weapon.tier; as sheetTier) {
-          <span [class]="'tile-sheet-tier sheet-tier-' + sheetTier" aria-hidden="true">{{
-            sheetTier
-          }}</span>
-        }
-        @if (r.isGodRoll) {
-          <span class="tile-god" aria-hidden="true">★</span>
-        }
+        <span class="tile-flags" aria-hidden="true">
+          @if (r.weapon.tier; as sheetTier) {
+            <span [class]="'tile-sheet-tier sheet-tier-' + sheetTier">{{ sheetTier }}</span>
+          }
+          @if (r.isGodRoll) {
+            <span class="tile-god">★</span>
+          }
+        </span>
       }
       @if (item().power; as power) {
         <span class="tile-badge">{{ power }}</span>
