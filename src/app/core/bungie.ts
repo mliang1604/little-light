@@ -66,6 +66,17 @@ export interface DestinyItemSocketsComponent {
   readonly sockets: readonly DestinyItemSocket[];
 }
 
+export interface DestinyItemReusablePlugs {
+  /** Available plug options keyed by socket index. */
+  readonly plugs: Readonly<Record<string, readonly { readonly plugItemHash: number }[]>>;
+}
+
+/** From the full item definition's sockets block (not present in the Lite manifest). */
+export interface SocketCategoryInfo {
+  readonly socketCategoryHash: number;
+  readonly socketIndexes: readonly number[];
+}
+
 export interface DestinyFullProfile extends DestinyProfile {
   readonly profileInventory: { readonly data?: DestinyItemList };
   readonly characterInventories: { readonly data?: Readonly<Record<string, DestinyItemList>> };
@@ -74,6 +85,9 @@ export interface DestinyFullProfile extends DestinyProfile {
     readonly instances: { readonly data?: Readonly<Record<string, DestinyItemInstance>> };
     readonly stats?: { readonly data?: Readonly<Record<string, DestinyItemStatsComponent>> };
     readonly sockets?: { readonly data?: Readonly<Record<string, DestinyItemSocketsComponent>> };
+    readonly reusablePlugs?: {
+      readonly data?: Readonly<Record<string, DestinyItemReusablePlugs>>;
+    };
   };
 }
 

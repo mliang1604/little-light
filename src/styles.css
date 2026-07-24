@@ -729,6 +729,34 @@ app-item-tile {
   padding: 0 1.1rem;
 }
 
+.perk-columns {
+  display: flex;
+  flex-wrap: wrap;
+  padding: 0.3rem 1.1rem 0.6rem;
+}
+
+.perk-column {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding: 0 0.6rem;
+  border-left: 1px solid var(--border);
+}
+
+.perk-column:first-child {
+  border-left: none;
+  padding-left: 0;
+}
+
+.plug-active {
+  border-color: var(--accent);
+  background: rgb(245 220 86 / 0.14);
+}
+
+.plug-inactive {
+  opacity: 0.5;
+}
+
 .detail-plugs {
   display: flex;
   flex-wrap: wrap;

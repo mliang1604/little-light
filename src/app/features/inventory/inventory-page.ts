@@ -9,7 +9,11 @@ import {
   buildItemDetail,
 } from '../../core/inventory';
 import { BUNGIE_ROOT, BungieApiError, CLASS_NAMES, pickPrimaryMembership } from '../../core/bungie';
-import type { DestinyCharacter, DestinyFullProfile } from '../../core/bungie';
+import type {
+  DestinyCharacter,
+  DestinyFullProfile,
+  SocketCategoryInfo,
+} from '../../core/bungie';
 import type { InventoryView, ItemDetailView, ItemView } from '../../core/inventory';
 import type { LoadedDefs } from '../../core/manifest.service';
 import { ItemDetail } from './item-detail';
@@ -198,9 +202,21 @@ export class InventoryPage implements OnInit {
     }
   }
 
-  protected openDetail(item: ItemView): void {
-    if (!this.defs || !this.profileData) return;
-    this.selected.set(buildItemDetail(item, this.profileData, this.defs.items, this.defs.statNames));
+  protected async openDetail(item: ItemView): Promise<void> {
+    const defs = this.defs;
+    const profileData = this.profileData;
+    if (!defs || !profileData) return;
+    let categories: readonly SocketCategoryInfo[] = [];
+    if (item.instanceId) {
+      try {
+        categories = await this.api.getItemSocketCategories(item.itemHash);
+      } catch {
+        // Without the socket layout, every plug falls back to the mods list.
+      }
+    }
+    this.selected.set(
+      buildItemDetail(item, profileData, defs.items, defs.statNames, categories, defs.socketCategoryNames),
+    );
   }
 
   protected emblemUrl(character: DestinyCharacter): string {

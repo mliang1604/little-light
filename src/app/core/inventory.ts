@@ -3,6 +3,7 @@ import type {
   DestinyFullProfile,
   DestinyItemComponent,
   DestinyItemInstance,
+  SocketCategoryInfo,
 } from './bungie';
 import type { ItemDefLite, ItemDefs, StatNames } from './manifest.service';
 
@@ -114,10 +115,17 @@ export interface ItemPlugView {
   readonly icon?: string;
 }
 
+export interface PerkOptionView extends ItemPlugView {
+  /** Whether this option is the one currently plugged. */
+  readonly active: boolean;
+}
+
 export interface ItemDetailView {
   readonly item: ItemView;
   readonly stats: readonly ItemStatView[];
-  readonly plugs: readonly ItemPlugView[];
+  /** One column per perk socket, DIM-style; each column lists that socket's options. */
+  readonly perkColumns: readonly (readonly PerkOptionView[])[];
+  readonly mods: readonly ItemPlugView[];
 }
 
 /** DIM's display order: weapon archetype stats first, then armor stats. */
@@ -150,11 +158,16 @@ const STAT_ORDER_INDEX = new Map(STAT_ORDER.map((hash, index) => [hash, index]))
 /** Absolute values that read as numbers, not 0–100 gauges. */
 const NO_BAR_STATS = new Set([4284893193, 3871231066, 2715839340]);
 
+/** Socket categories whose sockets render as perk columns rather than mods. */
+const PERK_CATEGORY_PATTERN = /perk|trait|intrinsic/i;
+
 export function buildItemDetail(
   item: ItemView,
   profile: DestinyFullProfile,
   defs: ItemDefs,
   statNames: StatNames,
+  socketCategories: readonly SocketCategoryInfo[],
+  socketCategoryNames: ReadonlyMap<number, string>,
 ): ItemDetailView {
   const instanceStats = item.instanceId
     ? (profile.itemComponents.stats?.data?.[item.instanceId]?.stats ?? {})
@@ -177,14 +190,44 @@ export function buildItemDetail(
   const sockets = item.instanceId
     ? (profile.itemComponents.sockets?.data?.[item.instanceId]?.sockets ?? [])
     : [];
-  const plugs: ItemPlugView[] = [];
-  for (const socket of sockets) {
-    if (!socket.isEnabled || socket.isVisible === false || socket.plugHash == null) continue;
-    const def = defs.get(socket.plugHash);
-    plugs.push({ name: def?.name ?? `#${socket.plugHash}`, icon: def?.icon });
+  const reusable = item.instanceId
+    ? (profile.itemComponents.reusablePlugs?.data?.[item.instanceId]?.plugs ?? {})
+    : {};
+
+  const perkIndexes: number[] = [];
+  for (const category of socketCategories) {
+    const name = socketCategoryNames.get(category.socketCategoryHash) ?? '';
+    if (PERK_CATEGORY_PATTERN.test(name)) perkIndexes.push(...category.socketIndexes);
+  }
+  const perkIndexSet = new Set(perkIndexes);
+
+  const perkColumns: (readonly PerkOptionView[])[] = [];
+  for (const index of perkIndexes) {
+    const socket = sockets[index];
+    if (!socket || socket.isVisible === false) continue;
+    const column: PerkOptionView[] = (reusable[String(index)] ?? []).map((option) => ({
+      ...plugView(defs, option.plugItemHash),
+      active: option.plugItemHash === socket.plugHash,
+    }));
+    if (column.length === 0 && socket.isEnabled && socket.plugHash != null) {
+      column.push({ ...plugView(defs, socket.plugHash), active: true });
+    }
+    if (column.length > 0) perkColumns.push(column);
   }
 
-  return { item, stats, plugs };
+  const mods: ItemPlugView[] = [];
+  sockets.forEach((socket, index) => {
+    if (perkIndexSet.has(index)) return;
+    if (!socket.isEnabled || socket.isVisible === false || socket.plugHash == null) return;
+    mods.push(plugView(defs, socket.plugHash));
+  });
+
+  return { item, stats, perkColumns, mods };
+}
+
+function plugView(defs: ItemDefs, hash: number): ItemPlugView {
+  const def = defs.get(hash);
+  return { name: def?.name ?? `#${hash}`, icon: def?.icon };
 }
 
 export function buildInventoryView(profile: DestinyFullProfile, defs: ItemDefs): InventoryView {
