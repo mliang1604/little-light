@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
 import { BUNGIE_ROOT } from '../../core/bungie';
 import type { ItemView } from '../../core/inventory';
 
@@ -8,7 +8,14 @@ const MAX_GEAR_TIER = 5;
   selector: 'app-item-tile',
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div [class]="'tile tier-' + item().tier" [title]="tooltip()">
+    <div
+      [class]="'tile tier-' + item().tier"
+      [title]="tooltip()"
+      role="button"
+      tabindex="0"
+      (click)="selected.emit(item())"
+      (keydown.enter)="selected.emit(item())"
+    >
       @if (item().icon; as icon) {
         <img class="tile-icon" [src]="root + icon" [alt]="item().name" loading="lazy" />
       }
@@ -32,6 +39,7 @@ const MAX_GEAR_TIER = 5;
 })
 export class ItemTile {
   readonly item = input.required<ItemView>();
+  readonly selected = output<ItemView>();
 
   protected readonly root = BUNGIE_ROOT;
 

@@ -4,7 +4,7 @@ import type {
   DestinyItemComponent,
   DestinyItemInstance,
 } from './bungie';
-import type { ItemDefLite, ItemDefs } from './manifest.service';
+import type { ItemDefLite, ItemDefs, StatNames } from './manifest.service';
 
 export interface ItemView {
   readonly itemHash: number;
@@ -100,6 +100,91 @@ export function toItemView(
 
 function byPowerThenName(a: ItemView, b: ItemView): number {
   return (b.power ?? 0) - (a.power ?? 0) || a.name.localeCompare(b.name);
+}
+
+export interface ItemStatView {
+  readonly name: string;
+  readonly value: number;
+  /** Present only for 0–100 gauges; absolute stats (RPM, magazine…) render as numbers. */
+  readonly barPercent?: number;
+}
+
+export interface ItemPlugView {
+  readonly name: string;
+  readonly icon?: string;
+}
+
+export interface ItemDetailView {
+  readonly item: ItemView;
+  readonly stats: readonly ItemStatView[];
+  readonly plugs: readonly ItemPlugView[];
+}
+
+/** DIM's display order: weapon archetype stats first, then armor stats. */
+const STAT_ORDER: readonly number[] = [
+  4284893193, // Rounds Per Minute
+  2961396640, // Charge Time
+  447667954, // Draw Time
+  3614673599, // Blast Radius
+  2523465841, // Velocity
+  4043523819, // Impact
+  1240592695, // Range
+  155624089, // Stability
+  943549884, // Handling
+  4188031367, // Reload Speed
+  1345609583, // Aim Assistance
+  2714457168, // Airborne Effectiveness
+  3555269338, // Zoom
+  2715839340, // Recoil Direction
+  3871231066, // Magazine
+  392767087, // Health
+  4244567218, // Melee
+  1735777505, // Grenade
+  144602215, // Super
+  1943323491, // Class
+  2996146975, // Weapons
+];
+
+const STAT_ORDER_INDEX = new Map(STAT_ORDER.map((hash, index) => [hash, index]));
+
+/** Absolute values that read as numbers, not 0–100 gauges. */
+const NO_BAR_STATS = new Set([4284893193, 3871231066, 2715839340]);
+
+export function buildItemDetail(
+  item: ItemView,
+  profile: DestinyFullProfile,
+  defs: ItemDefs,
+  statNames: StatNames,
+): ItemDetailView {
+  const instanceStats = item.instanceId
+    ? (profile.itemComponents.stats?.data?.[item.instanceId]?.stats ?? {})
+    : {};
+  const stats = Object.values(instanceStats)
+    .map(({ statHash, value }) => ({
+      order: STAT_ORDER_INDEX.get(statHash) ?? STAT_ORDER.length,
+      stat: {
+        name: statNames.get(statHash) ?? `Stat ${statHash}`,
+        value,
+        barPercent:
+          NO_BAR_STATS.has(statHash) || value > 100
+            ? undefined
+            : Math.max(0, Math.min(value, 100)),
+      },
+    }))
+    .sort((a, b) => a.order - b.order || a.stat.name.localeCompare(b.stat.name))
+    .map(({ stat }) => stat);
+
+  const sockets = item.instanceId
+    ? (profile.itemComponents.sockets?.data?.[item.instanceId]?.sockets ?? [])
+    : [];
+  const plugs: ItemPlugView[] = [];
+  for (const socket of sockets) {
+    if (!socket.isEnabled || socket.isVisible === false || socket.plugHash == null) continue;
+    const def = defs.get(socket.plugHash);
+    plugs.push({ name: def?.name ?? `#${socket.plugHash}`, icon: def?.icon });
+  }
+
+  return { item, stats, plugs };
 }
 
 export function buildInventoryView(profile: DestinyFullProfile, defs: ItemDefs): InventoryView {

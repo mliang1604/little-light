@@ -52,12 +52,28 @@ export interface DestinyItemList {
   readonly items: readonly DestinyItemComponent[];
 }
 
+export interface DestinyItemStatsComponent {
+  readonly stats: Readonly<Record<string, { readonly statHash: number; readonly value: number }>>;
+}
+
+export interface DestinyItemSocket {
+  readonly plugHash?: number;
+  readonly isEnabled: boolean;
+  readonly isVisible?: boolean;
+}
+
+export interface DestinyItemSocketsComponent {
+  readonly sockets: readonly DestinyItemSocket[];
+}
+
 export interface DestinyFullProfile extends DestinyProfile {
   readonly profileInventory: { readonly data?: DestinyItemList };
   readonly characterInventories: { readonly data?: Readonly<Record<string, DestinyItemList>> };
   readonly characterEquipment: { readonly data?: Readonly<Record<string, DestinyItemList>> };
   readonly itemComponents: {
     readonly instances: { readonly data?: Readonly<Record<string, DestinyItemInstance>> };
+    readonly stats?: { readonly data?: Readonly<Record<string, DestinyItemStatsComponent>> };
+    readonly sockets?: { readonly data?: Readonly<Record<string, DestinyItemSocketsComponent>> };
   };
 }
 
