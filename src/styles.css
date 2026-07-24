@@ -345,6 +345,9 @@ button[type='submit']:disabled {
   display: flex;
   gap: 6px;
   align-items: flex-start;
+  /* A bucket holds at most 9 stored items (3×3), so reserving three tile
+     rows keeps every category aligned across character columns. */
+  min-height: calc(3 * var(--tile, 48px) + 2 * 4px);
 }
 
 .inv-equipped {
