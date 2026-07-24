@@ -1,7 +1,8 @@
-import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, signal, untracked } from '@angular/core';
+import { AccountService } from '../../core/account.service';
 import { AuthService } from '../../core/auth.service';
 import { BungieApiService } from '../../core/bungie-api.service';
-import { BungieApiError, pickPrimaryMembership } from '../../core/bungie';
+import { BungieApiError } from '../../core/bungie';
 import type { DestinyProfile, UserInfoCard } from '../../core/bungie';
 import { ProfileView } from '../profile/profile-view';
 
@@ -28,41 +29,50 @@ interface LoadedProfile {
           </p>
         }
       </section>
-    } @else if (loading()) {
+    } @else if (busy()) {
       <p class="lede">Loading your Guardian…</p>
-    } @else if (error(); as message) {
+    } @else if (displayError(); as message) {
       <p class="error" role="alert">{{ message }}</p>
     } @else if (result(); as r) {
       <app-profile-view [player]="r.player" [profile]="r.profile" />
     }
   `,
 })
-export class MePage implements OnInit {
+export class MePage {
   protected readonly auth = inject(AuthService);
+  protected readonly account = inject(AccountService);
   private readonly api = inject(BungieApiService);
 
   protected readonly loading = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly result = signal<LoadedProfile | null>(null);
 
-  async ngOnInit(): Promise<void> {
-    if (this.auth.isSignedIn()) await this.load();
-  }
+  protected readonly busy = computed(() => this.loading() || this.account.loading());
+  protected readonly displayError = computed(() => this.error() ?? this.account.error());
 
-  private async load(): Promise<void> {
-    this.loading.set(true);
-    try {
-      const memberships = await this.api.getCurrentUserMemberships();
-      const primary = pickPrimaryMembership(
-        memberships.destinyMemberships,
-        memberships.primaryMembershipId,
-      );
-      if (!primary) {
-        this.error.set('No Destiny 2 accounts are linked to this Bungie.net profile.');
+  private loadedId: string | null = null;
+
+  constructor() {
+    effect(() => {
+      if (!this.auth.isSignedIn()) return;
+      const membership = this.account.selected();
+      if (!membership) {
+        this.loadedId = null;
         return;
       }
-      const profile = await this.api.getProfile(primary.membershipType, primary.membershipId);
-      this.result.set({ player: primary, profile });
+      if (membership.membershipId === this.loadedId) return;
+      this.loadedId = membership.membershipId;
+      untracked(() => void this.load(membership));
+    });
+  }
+
+  private async load(membership: UserInfoCard): Promise<void> {
+    this.loading.set(true);
+    this.error.set(null);
+    this.result.set(null);
+    try {
+      const profile = await this.api.getProfile(membership.membershipType, membership.membershipId);
+      this.result.set({ player: membership, profile });
     } catch (err) {
       if (err instanceof BungieApiError && err.status === 401) {
         this.auth.signOut();

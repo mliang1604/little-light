@@ -1,4 +1,9 @@
-import { formatNameCode, parseBungieName, pickPrimaryMembership } from './bungie';
+import {
+  formatNameCode,
+  parseBungieName,
+  pickPrimaryMembership,
+  usableMemberships,
+} from './bungie';
 import type { UserInfoCard } from './bungie';
 
 describe('parseBungieName', () => {
@@ -53,6 +58,20 @@ function card(overrides: Partial<UserInfoCard>): UserInfoCard {
     ...overrides,
   };
 }
+
+describe('usableMemberships', () => {
+  it('keeps every account when cross save is off', () => {
+    const xbox = card({ membershipType: 1, membershipId: 'x' });
+    const steam = card({ membershipType: 3, membershipId: 's' });
+    expect(usableMemberships([xbox, steam])).toEqual([xbox, steam]);
+  });
+
+  it('keeps only the primary platform when cross save is on', () => {
+    const xboxShell = card({ membershipType: 1, membershipId: 'x', crossSaveOverride: 3 });
+    const steamPrimary = card({ membershipType: 3, membershipId: 's', crossSaveOverride: 3 });
+    expect(usableMemberships([xboxShell, steamPrimary])).toEqual([steamPrimary]);
+  });
+});
 
 describe('pickPrimaryMembership', () => {
   it('returns null for no memberships', () => {

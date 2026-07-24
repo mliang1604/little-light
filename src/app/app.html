@@ -8,6 +8,18 @@
       <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">Search</a>
       <a routerLink="/inventory" routerLinkActive="active">Inventory</a>
       <a routerLink="/me" routerLinkActive="active">Your Guardian</a>
+      @if (auth.isSignedIn() && account.memberships().length > 1) {
+        <select class="account-select" aria-label="Destiny account" (change)="onAccountChange($event)">
+          @for (m of account.memberships(); track m.membershipId) {
+            <option
+              [value]="m.membershipId"
+              [selected]="m.membershipId === account.selected()?.membershipId"
+            >
+              Destiny 2 · {{ platformNames[m.membershipType] ?? 'Platform ' + m.membershipType }}
+            </option>
+          }
+        </select>
+      }
       @if (auth.isSignedIn()) {
         <button type="button" class="link-button" (click)="auth.signOut()">Sign out</button>
       }

@@ -148,6 +148,22 @@ code {
   color: var(--text);
 }
 
+.account-select {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.85rem;
+  padding: 0.25rem 0.4rem;
+  cursor: pointer;
+}
+
+.account-select option {
+  background: #151a22;
+  color: var(--text);
+}
+
 .link-button {
   background: none;
   border: none;
