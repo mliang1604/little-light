@@ -53,10 +53,34 @@ import type { ItemDetailView } from '../../core/inventory';
           </dl>
         }
 
-        @if (detail().plugs.length > 0) {
-          <h3 class="inv-label">Perks &amp; Mods</h3>
+        @if (detail().perkColumns.length > 0) {
+          <h3 class="inv-label">Perks</h3>
+          <div class="perk-columns">
+            @for (column of detail().perkColumns; track $index) {
+              <div class="perk-column">
+                @for (perk of column; track $index) {
+                  <span
+                    class="plug"
+                    [class.plug-active]="perk.active"
+                    [class.plug-inactive]="!perk.active"
+                    [title]="perk.name"
+                  >
+                    @if (perk.icon; as icon) {
+                      <img [src]="root + icon" [alt]="perk.name" loading="lazy" />
+                    } @else {
+                      <span class="plug-fallback">?</span>
+                    }
+                  </span>
+                }
+              </div>
+            }
+          </div>
+        }
+
+        @if (detail().mods.length > 0) {
+          <h3 class="inv-label">Mods</h3>
           <div class="detail-plugs">
-            @for (plug of detail().plugs; track $index) {
+            @for (plug of detail().mods; track $index) {
               <span class="plug" [title]="plug.name">
                 @if (plug.icon; as icon) {
                   <img [src]="root + icon" [alt]="plug.name" loading="lazy" />

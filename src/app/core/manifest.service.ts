@@ -19,6 +19,7 @@ export type StatNames = ReadonlyMap<number, string>;
 export interface LoadedDefs {
   readonly items: ItemDefs;
   readonly statNames: StatNames;
+  readonly socketCategoryNames: ReadonlyMap<number, string>;
 }
 
 export type ManifestState =
@@ -36,13 +37,14 @@ interface RawItemDef {
   readonly iconWatermark?: string;
 }
 
-interface RawStatDef {
+interface RawNamedDef {
   readonly displayProperties?: { readonly name?: string };
 }
 
 const META_KEY = 'manifest-meta';
 const ITEM_DEFS_KEY = 'item-defs';
 const STAT_DEFS_KEY = 'stat-defs';
+const SOCKET_CATEGORY_DEFS_KEY = 'socket-category-defs';
 const PROGRESS_STEP_BYTES = 2 * 1024 * 1024;
 
 @Injectable({ providedIn: 'root' })
@@ -78,25 +80,30 @@ export class ManifestService {
 
     const cachedMeta = await idbGet<{ version: string }>(META_KEY);
     if (cachedMeta?.version === info.version) {
-      const [items, statNames] = await Promise.all([
+      const [items, statNames, socketCategoryNames] = await Promise.all([
         idbGet<Map<number, ItemDefLite>>(ITEM_DEFS_KEY),
         idbGet<Map<number, string>>(STAT_DEFS_KEY),
+        idbGet<Map<number, string>>(SOCKET_CATEGORY_DEFS_KEY),
       ]);
-      if (items && items.size > 0 && statNames && statNames.size > 0) {
-        return { items, statNames };
+      if (items?.size && statNames?.size && socketCategoryNames?.size) {
+        return { items, statNames, socketCategoryNames };
       }
     }
 
-    const statNames = trimStatDefs(await fetchJson<Record<string, RawStatDef>>(
-      BUNGIE_ROOT + info.statDefPath,
-    ));
+    const statNames = trimNames(
+      await fetchJson<Record<string, RawNamedDef>>(BUNGIE_ROOT + info.statDefPath),
+    );
+    const socketCategoryNames = trimNames(
+      await fetchJson<Record<string, RawNamedDef>>(BUNGIE_ROOT + info.socketCategoryDefPath),
+    );
     const rawItems = await this.download(BUNGIE_ROOT + info.itemLitePath);
     this.state.set({ kind: 'processing' });
     const items = trimDefs(rawItems);
     await idbSet(ITEM_DEFS_KEY, items);
     await idbSet(STAT_DEFS_KEY, statNames);
+    await idbSet(SOCKET_CATEGORY_DEFS_KEY, socketCategoryNames);
     await idbSet(META_KEY, { version: info.version });
-    return { items, statNames };
+    return { items, statNames, socketCategoryNames };
   }
 
   private async download(url: string): Promise<Record<string, RawItemDef>> {
@@ -151,7 +158,7 @@ function trimDefs(raw: Readonly<Record<string, RawItemDef>>): ItemDefs {
   return map;
 }
 
-function trimStatDefs(raw: Readonly<Record<string, RawStatDef>>): StatNames {
+function trimNames(raw: Readonly<Record<string, RawNamedDef>>): Map<number, string> {
   const map = new Map<number, string>();
   for (const [hash, def] of Object.entries(raw)) {
     const name = def.displayProperties?.name;

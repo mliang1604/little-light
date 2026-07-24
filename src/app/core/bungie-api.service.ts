@@ -8,6 +8,7 @@ import type {
   CurrentUserMemberships,
   DestinyFullProfile,
   DestinyProfile,
+  SocketCategoryInfo,
   UserInfoCard,
 } from './bungie';
 
@@ -16,14 +17,21 @@ const PROFILE_COMPONENTS = '100,200';
 
 /**
  * Adds 102 ProfileInventories (vault), 201 CharacterInventories, 205 CharacterEquipment,
- * 300 ItemInstances, 304 ItemStats, 305 ItemSockets.
+ * 300 ItemInstances, 304 ItemStats, 305 ItemSockets, 310 ItemReusablePlugs.
  */
-const INVENTORY_COMPONENTS = '100,102,200,201,205,300,304,305';
+const INVENTORY_COMPONENTS = '100,102,200,201,205,300,304,305,310';
 
 export interface ManifestInfo {
   readonly version: string;
   readonly itemLitePath: string;
   readonly statDefPath: string;
+  readonly socketCategoryDefPath: string;
+}
+
+interface RawFullItemDef {
+  readonly sockets?: {
+    readonly socketCategories?: readonly SocketCategoryInfo[];
+  };
 }
 
 interface RawManifestResponse {
@@ -34,6 +42,7 @@ interface RawManifestResponse {
 @Injectable({ providedIn: 'root' })
 export class BungieApiService {
   private readonly http = inject(HttpClient);
+  private readonly socketCategoryCache = new Map<number, Promise<readonly SocketCategoryInfo[]>>();
 
   async searchPlayer(bungieName: string): Promise<UserInfoCard | null> {
     const parsed = parseBungieName(bungieName);
@@ -72,10 +81,32 @@ export class BungieApiService {
     const en = manifest.jsonWorldComponentContentPaths['en'];
     const itemLitePath = en?.['DestinyInventoryItemLiteDefinition'];
     const statDefPath = en?.['DestinyStatDefinition'];
-    if (!itemLitePath || !statDefPath) {
+    const socketCategoryDefPath = en?.['DestinySocketCategoryDefinition'];
+    if (!itemLitePath || !statDefPath || !socketCategoryDefPath) {
       throw new BungieApiError('Manifest is missing English definitions.');
     }
-    return { version: manifest.version, itemLitePath, statDefPath };
+    return { version: manifest.version, itemLitePath, statDefPath, socketCategoryDefPath };
+  }
+
+  /**
+   * Socket layout for one item from its full definition (the Lite manifest strips
+   * the sockets block). Cached per hash; a detail popup costs at most one request.
+   */
+  getItemSocketCategories(itemHash: number): Promise<readonly SocketCategoryInfo[]> {
+    let cached = this.socketCategoryCache.get(itemHash);
+    if (!cached) {
+      cached = this.request<RawFullItemDef>(
+        'GET',
+        `/Destiny2/Manifest/DestinyInventoryItemDefinition/${itemHash}/`,
+      )
+        .then((def) => def.sockets?.socketCategories ?? [])
+        .catch((err: unknown) => {
+          this.socketCategoryCache.delete(itemHash);
+          throw err;
+        });
+      this.socketCategoryCache.set(itemHash, cached);
+    }
+    return cached;
   }
 
   private async request<T>(method: 'GET' | 'POST', path: string, body?: unknown): Promise<T> {
