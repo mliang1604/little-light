@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } 
 import { AuthService } from '../../core/auth.service';
 import { BungieApiService } from '../../core/bungie-api.service';
 import { ManifestService } from '../../core/manifest.service';
-import { buildInventoryView } from '../../core/inventory';
+import { ENGRAM_CAPACITY, POSTMASTER_CAPACITY, buildInventoryView } from '../../core/inventory';
 import { BUNGIE_ROOT, BungieApiError, CLASS_NAMES, pickPrimaryMembership } from '../../core/bungie';
 import type { DestinyCharacter, DestinyFullProfile } from '../../core/bungie';
 import type { InventoryView } from '../../core/inventory';
@@ -60,6 +60,36 @@ import { ItemTile } from './item-tile';
               <h2>Vault</h2>
               <span class="inv-vault-count">{{ v.vaultTotal }}</span>
             </header>
+
+            @for (pm of v.postmaster; track $index) {
+              <div class="inv-cell">
+                <h3 class="inv-label">
+                  Postmaster
+                  <span class="inv-count">{{ pm.lostItems.length }}/{{ postmasterCapacity }}</span>
+                </h3>
+                <div class="engram-row">
+                  @for (slot of engramSlots; track slot) {
+                    @if (pm.engrams[slot]; as engram) {
+                      <span
+                        class="engram"
+                        [title]="engram.name"
+                        [style.background-image]="
+                          engram.icon ? 'url(' + root + engram.icon + ')' : ''
+                        "
+                      ></span>
+                    } @else {
+                      <span class="engram engram-empty"></span>
+                    }
+                  }
+                </div>
+                <div class="postmaster-grid">
+                  @for (lost of pm.lostItems; track lost.instanceId ?? $index) {
+                    <app-item-tile [item]="lost" />
+                  }
+                </div>
+              </div>
+            }
+            <div class="inv-cell inv-vault-cell"></div>
 
             @for (row of v.rows; track row.hash) {
               @for (cell of row.perCharacter; track $index) {
@@ -120,6 +150,9 @@ export class InventoryPage implements OnInit {
   private readonly api = inject(BungieApiService);
 
   protected readonly classNames = CLASS_NAMES;
+  protected readonly root = BUNGIE_ROOT;
+  protected readonly postmasterCapacity = POSTMASTER_CAPACITY;
+  protected readonly engramSlots = Array.from({ length: ENGRAM_CAPACITY }, (_, i) => i);
   protected readonly loading = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly view = signal<InventoryView | null>(null);

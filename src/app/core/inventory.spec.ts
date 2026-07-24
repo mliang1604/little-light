@@ -166,4 +166,30 @@ describe('buildInventoryView', () => {
     expect(view.rows.every((r) => r.vault.length === 0)).toBe(true);
     expect(view.otherVault).toEqual([]);
   });
+
+  it('separates postmaster engrams and lost items, preserving arrival order', () => {
+    const ENGRAMS = 375726501;
+    const POSTMASTER = 215593132;
+    const view = buildInventoryView(
+      profile({
+        characters: { a: character('2026-07-01T00:00:00Z') },
+        inventories: {
+          a: [item(1, POSTMASTER, 'weak'), item(5, ENGRAMS), item(2, POSTMASTER, 'strong')],
+        },
+        instances: {
+          weak: { primaryStat: { value: 10 } },
+          strong: { primaryStat: { value: 500 } },
+        },
+      }),
+      DEFS,
+    );
+
+    expect(view.postmaster).toHaveLength(1);
+    expect(view.postmaster[0]!.engrams.map((i) => i.name)).toEqual(['Shards']);
+    // Arrival order, not power order — postmaster overflow discards oldest first.
+    expect(view.postmaster[0]!.lostItems.map((i) => i.name)).toEqual(['Auto Low', 'Auto High']);
+    // Postmaster buckets must not leak into the gear rows.
+    const kinetic = view.rows.find((r) => r.hash === KINETIC)!;
+    expect(kinetic.perCharacter[0]!.stored).toEqual([]);
+  });
 });
