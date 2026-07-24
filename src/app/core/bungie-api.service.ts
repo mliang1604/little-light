@@ -29,9 +29,16 @@ export interface ManifestInfo {
 }
 
 interface RawFullItemDef {
+  readonly displayProperties?: { readonly description?: string };
   readonly sockets?: {
     readonly socketCategories?: readonly SocketCategoryInfo[];
   };
+}
+
+/** On-demand pieces of the full item definition that the Lite manifest strips. */
+export interface ItemDefExtras {
+  readonly description: string;
+  readonly socketCategories: readonly SocketCategoryInfo[];
 }
 
 interface RawManifestResponse {
@@ -42,7 +49,7 @@ interface RawManifestResponse {
 @Injectable({ providedIn: 'root' })
 export class BungieApiService {
   private readonly http = inject(HttpClient);
-  private readonly socketCategoryCache = new Map<number, Promise<readonly SocketCategoryInfo[]>>();
+  private readonly itemExtrasCache = new Map<number, Promise<ItemDefExtras>>();
 
   async searchPlayer(bungieName: string): Promise<UserInfoCard | null> {
     const parsed = parseBungieName(bungieName);
@@ -89,22 +96,25 @@ export class BungieApiService {
   }
 
   /**
-   * Socket layout for one item from its full definition (the Lite manifest strips
-   * the sockets block). Cached per hash; a detail popup costs at most one request.
+   * Description and socket layout for one item from its full definition (the Lite
+   * manifest strips both). Cached per hash; each unique item costs one request.
    */
-  getItemSocketCategories(itemHash: number): Promise<readonly SocketCategoryInfo[]> {
-    let cached = this.socketCategoryCache.get(itemHash);
+  getItemExtras(itemHash: number): Promise<ItemDefExtras> {
+    let cached = this.itemExtrasCache.get(itemHash);
     if (!cached) {
       cached = this.request<RawFullItemDef>(
         'GET',
         `/Destiny2/Manifest/DestinyInventoryItemDefinition/${itemHash}/`,
       )
-        .then((def) => def.sockets?.socketCategories ?? [])
+        .then((def) => ({
+          description: def.displayProperties?.description ?? '',
+          socketCategories: def.sockets?.socketCategories ?? [],
+        }))
         .catch((err: unknown) => {
-          this.socketCategoryCache.delete(itemHash);
+          this.itemExtrasCache.delete(itemHash);
           throw err;
         });
-      this.socketCategoryCache.set(itemHash, cached);
+      this.itemExtrasCache.set(itemHash, cached);
     }
     return cached;
   }

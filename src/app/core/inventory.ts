@@ -111,6 +111,7 @@ export interface ItemStatView {
 }
 
 export interface ItemPlugView {
+  readonly hash: number;
   readonly name: string;
   readonly icon?: string;
 }
@@ -227,7 +228,7 @@ export function buildItemDetail(
 
 function plugView(defs: ItemDefs, hash: number): ItemPlugView {
   const def = defs.get(hash);
-  return { name: def?.name ?? `#${hash}`, icon: def?.icon };
+  return { hash, name: def?.name ?? `#${hash}`, icon: def?.icon };
 }
 
 export function buildInventoryView(profile: DestinyFullProfile, defs: ItemDefs): InventoryView {
