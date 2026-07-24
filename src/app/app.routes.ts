@@ -13,6 +13,11 @@ export const routes: Routes = [
     title: 'Little Light — Inventory',
   },
   {
+    path: 'shopping',
+    loadComponent: () => import('./features/shopping/shopping-page').then((m) => m.ShoppingPage),
+    title: 'Little Light — Shopping List',
+  },
+  {
     path: 'me',
     loadComponent: () => import('./features/me/me-page').then((m) => m.MePage),
     title: 'Little Light — Your Guardian',

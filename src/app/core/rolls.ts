@@ -65,6 +65,16 @@ export function buildSheetIndex(weapons: readonly SheetWeapon[]): SheetIndex {
   return index;
 }
 
+/** Adapter so shopping-list wants can be scored with the same roll evaluator. */
+export function shoppingWeapon(item: SheetShoppingItem): SheetWeapon {
+  return {
+    name: item.name,
+    type: 'Shopping',
+    enhanceable: false,
+    columns: { barrel: [], mag: [], perk1: item.col1, perk2: item.col2, origin: [] },
+  };
+}
+
 export interface RollAssessment {
   readonly weapon: SheetWeapon;
   readonly perk1Match: boolean;
