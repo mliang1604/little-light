@@ -33,12 +33,22 @@ export interface SheetShoppingItem {
   readonly alternatives: readonly string[];
 }
 
+/** A row from the sheet's Perks or Origin Traits tab. */
+export interface SheetPerk {
+  readonly name: string;
+  readonly tags: readonly string[];
+  readonly description?: string;
+  readonly rank?: number;
+  readonly tier?: string;
+}
+
 export interface EndgameAnalysis {
   readonly generatedAt: string;
   readonly sourceFile: string;
   readonly weaponCount: number;
   readonly weapons: readonly SheetWeapon[];
   readonly shoppingList: readonly SheetShoppingItem[];
+  readonly perks?: readonly SheetPerk[];
 }
 
 const VARIANT_SUFFIX = /\s*\((adept|timelost|harrowed)\)\s*$/i;
@@ -75,6 +85,17 @@ export function shoppingWeapon(item: SheetShoppingItem): SheetWeapon {
   };
 }
 
+export type PerkIndex = ReadonlyMap<string, SheetPerk>;
+
+export function buildPerkIndex(perks: readonly SheetPerk[]): PerkIndex {
+  const index = new Map<string, SheetPerk>();
+  for (const perk of perks) {
+    const key = normalizeName(perk.name);
+    if (!index.has(key)) index.set(key, perk);
+  }
+  return index;
+}
+
 export interface RollAssessment {
   readonly weapon: SheetWeapon;
   readonly perk1Match: boolean;
@@ -83,6 +104,8 @@ export interface RollAssessment {
   readonly magMatch: boolean;
   readonly originMatch: boolean;
   readonly isGodRoll: boolean;
+  /** God roll plus recommended barrel and mag available; origin trait is optional. */
+  readonly isPerfectRoll: boolean;
 }
 
 /**
@@ -127,13 +150,25 @@ export function evaluateRoll(
     isGodRoll = false;
   }
 
+  const barrelMatch = matchingSockets(weapon.columns.barrel).length > 0;
+  const magMatch = matchingSockets(weapon.columns.mag).length > 0;
+  const originMatch = matchingSockets(weapon.columns.origin).length > 0;
+
+  const satisfied = (recommended: readonly string[], matched: boolean) =>
+    recommended.length === 0 || matched;
+  const isPerfectRoll =
+    isGodRoll &&
+    satisfied(weapon.columns.barrel, barrelMatch) &&
+    satisfied(weapon.columns.mag, magMatch);
+
   return {
     weapon,
     perk1Match,
     perk2Match,
-    barrelMatch: matchingSockets(weapon.columns.barrel).length > 0,
-    magMatch: matchingSockets(weapon.columns.mag).length > 0,
-    originMatch: matchingSockets(weapon.columns.origin).length > 0,
+    barrelMatch,
+    magMatch,
+    originMatch,
     isGodRoll,
+    isPerfectRoll,
   };
 }

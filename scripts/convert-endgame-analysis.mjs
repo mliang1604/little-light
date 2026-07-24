@@ -108,6 +108,33 @@ function parseWeaponTab(tab, type) {
   return weapons;
 }
 
+/** Perks and Origin Traits tabs share the Name/Tags/Description/Rank/Tier shape. */
+function parsePerksTab(tab) {
+  const rows = sheetRows(tab);
+  if (!rows) {
+    console.warn(`!! missing tab: ${tab}`);
+    return [];
+  }
+  const header = headerIndex(rows);
+  if (!header) return [];
+  const cell = (row, name) => (header.map.has(name) ? row[header.map.get(name)] : null);
+
+  const perks = [];
+  for (const row of rows.slice(header.rowIndex + 1)) {
+    const name = clean(cell(row, 'Name'));
+    if (!name) continue;
+    const rank = Number(clean(cell(row, 'Rank')));
+    perks.push({
+      name,
+      tags: splitCell(cell(row, 'Tags')),
+      description: clean(cell(row, 'Description')) || undefined,
+      rank: Number.isFinite(rank) && rank > 0 ? rank : undefined,
+      tier: clean(cell(row, 'Tier')) || undefined,
+    });
+  }
+  return perks;
+}
+
 function parseShoppingList() {
   const rows = sheetRows('Shopping List');
   if (!rows) {
@@ -142,6 +169,7 @@ for (const [tab, type] of Object.entries(WEAPON_TABS)) {
   weapons.push(...parsed);
 }
 const shoppingList = parseShoppingList();
+const perks = [...parsePerksTab('Perks'), ...parsePerksTab('Origin Traits')];
 
 const data = {
   generatedAt: new Date().toISOString(),
@@ -149,8 +177,11 @@ const data = {
   weaponCount: weapons.length,
   weapons,
   shoppingList,
+  perks,
 };
 
 writeFileSync(OUTPUT, JSON.stringify(data, null, 1));
-console.log(`\ntotal: ${weapons.length} weapons, ${shoppingList.length} shopping items`);
+console.log(
+  `\ntotal: ${weapons.length} weapons, ${shoppingList.length} shopping items, ${perks.length} perks`,
+);
 console.log(`wrote: ${OUTPUT}`);

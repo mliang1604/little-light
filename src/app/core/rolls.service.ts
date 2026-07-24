@@ -1,6 +1,13 @@
 import { Injectable, signal } from '@angular/core';
-import { buildSheetIndex, evaluateRoll, normalizeName } from './rolls';
-import type { EndgameAnalysis, RollAssessment, SheetIndex, SheetWeapon } from './rolls';
+import { buildPerkIndex, buildSheetIndex, evaluateRoll, normalizeName } from './rolls';
+import type {
+  EndgameAnalysis,
+  PerkIndex,
+  RollAssessment,
+  SheetIndex,
+  SheetPerk,
+  SheetWeapon,
+} from './rolls';
 import type { ItemView } from './inventory';
 
 export type RollsState = 'idle' | 'loading' | 'ready' | 'error';
@@ -12,6 +19,7 @@ export class RollsService {
 
   private data: EndgameAnalysis | null = null;
   private index: SheetIndex | null = null;
+  private perkIndex: PerkIndex | null = null;
   private inflight: Promise<void> | null = null;
   private readonly assessments = new Map<string, RollAssessment | null>();
 
@@ -31,6 +39,11 @@ export class RollsService {
 
   lookup(name: string): SheetWeapon | undefined {
     return this.index?.get(normalizeName(name));
+  }
+
+  /** Sheet rating/commentary for a perk or origin trait, by plug name. */
+  lookupPerk(name: string): SheetPerk | undefined {
+    return this.perkIndex?.get(normalizeName(name));
   }
 
   /** Assessment for an owned item, memoized per instance; null when not on the sheet. */
@@ -54,6 +67,7 @@ export class RollsService {
     }
     this.data = (await response.json()) as EndgameAnalysis;
     this.index = buildSheetIndex(this.data.weapons);
+    this.perkIndex = buildPerkIndex(this.data.perks ?? []);
     this.state.set('ready');
   }
 }

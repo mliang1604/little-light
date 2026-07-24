@@ -9,9 +9,10 @@ import {
 } from '@angular/core';
 import { BUNGIE_ROOT } from '../../core/bungie';
 import { BungieApiService } from '../../core/bungie-api.service';
+import { RollsService } from '../../core/rolls.service';
 import { composePlugDescription } from '../../core/inventory';
 import { normalizeName } from '../../core/rolls';
-import type { RollAssessment } from '../../core/rolls';
+import type { RollAssessment, SheetPerk } from '../../core/rolls';
 import type { ItemDetailView, ItemPlugView } from '../../core/inventory';
 
 /** Viewport-fixed placement computed from the clicked tile's rect. */
@@ -27,6 +28,7 @@ interface PlugInfo extends PopoverPosition {
   readonly icon?: string;
   readonly description: string;
   readonly loading: boolean;
+  readonly sheet?: SheetPerk;
 }
 
 const PLUG_POPOVER_WIDTH = 260;
@@ -169,6 +171,22 @@ const PLUG_POPOVER_WIDTH = 260;
             }
             <h4>{{ info.name }}</h4>
           </header>
+          @if (info.sheet; as sheet) {
+            <p class="plug-sheet">
+              @if (sheet.tier; as tier) {
+                <strong [class]="'sheet-tier-' + tier">{{ tier }}-tier</strong>
+              }
+              @if (sheet.rank) {
+                <span> #{{ sheet.rank }}</span>
+              }
+              @if (sheet.tags.length > 0) {
+                <span class="plug-sheet-tags"> · {{ sheet.tags.join(', ') }}</span>
+              }
+            </p>
+            @if (sheet.description) {
+              <p class="plug-sheet-notes">{{ sheet.description }}</p>
+            }
+          }
           <p>{{ info.loading ? 'Loading…' : info.description }}</p>
         </div>
       }
@@ -185,6 +203,7 @@ export class ItemDetail {
   protected readonly plugInfo = signal<PlugInfo | null>(null);
 
   private readonly api = inject(BungieApiService);
+  private readonly rolls = inject(RollsService);
 
   private readonly recommendedNames = computed(() => {
     const weapon = this.roll()?.weapon;
@@ -220,7 +239,8 @@ export class ItemDetail {
     }
     const anchor = (event.currentTarget as HTMLElement).getBoundingClientRect();
     const placement = plugPopoverPosition(anchor);
-    this.plugInfo.set({ ...plug, ...placement, description: '', loading: true });
+    const sheet = this.rolls.lookupPerk(plug.name);
+    this.plugInfo.set({ ...plug, ...placement, sheet, description: '', loading: true });
     let description: string;
     try {
       const extras = await this.api.getItemExtras(plug.hash);
@@ -235,7 +255,7 @@ export class ItemDetail {
       description = 'Could not load the description.';
     }
     if (this.plugInfo()?.hash === plug.hash) {
-      this.plugInfo.set({ ...plug, ...placement, description, loading: false });
+      this.plugInfo.set({ ...plug, ...placement, sheet, description, loading: false });
     }
   }
 }

@@ -14,6 +14,7 @@ const MAX_GEAR_TIER = 5;
 @Component({
   selector: 'app-item-tile',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { '[class.perfect-roll]': 'perfect()' },
   template: `
     <div
       [class]="'tile tier-' + item().tier"
@@ -66,6 +67,8 @@ export class ItemTile {
     this.selected.emit({ item: this.item(), anchor });
   }
 
+  protected readonly perfect = computed(() => this.roll()?.isPerfectRoll ?? false);
+
   protected readonly pips = computed(() => {
     const gearTier = this.item().gearTier ?? 0;
     return Array.from({ length: Math.min(gearTier, MAX_GEAR_TIER) }, (_, i) => i);
@@ -76,10 +79,9 @@ export class ItemTile {
     const power = item.power != null ? ` · ${item.power}` : '';
     const gearTier = item.gearTier != null ? ` · Tier ${item.gearTier}` : '';
     const roll = this.roll();
+    const rollNote = roll?.isPerfectRoll ? ' · perfect roll' : roll?.isGodRoll ? ' · god roll' : '';
     const sheet = roll?.weapon.tier
-      ? ` · Sheet ${roll.weapon.tier}${roll.weapon.rank ? ' #' + roll.weapon.rank : ''}${
-          roll.isGodRoll ? ' · god roll' : ''
-        }`
+      ? ` · Sheet ${roll.weapon.tier}${roll.weapon.rank ? ' #' + roll.weapon.rank : ''}${rollNote}`
       : '';
     return `${item.name} · ${item.itemType}${power}${gearTier}${sheet}`;
   });
