@@ -24,6 +24,8 @@ export interface ItemView {
   readonly bucket: number;
   /** DamageType enum value; 0/absent for armor and non-weapons. */
   readonly damageType?: number;
+  /** Intrinsic champion breaker: 1 Anti-Barrier, 2 Overload, 3 Unstoppable. */
+  readonly breakerType?: number;
   /** Option names per socket (plugged + reusable), for roll matching and perk search. */
   readonly socketOptionNames?: readonly (readonly string[])[];
 }
@@ -111,6 +113,7 @@ export function toItemView(
     itemType: def.itemType,
     bucket: def.bucket,
     damageType: instance?.damageType || undefined,
+    breakerType: instance?.breakerType || undefined,
     socketOptionNames: buildSocketOptionNames(item.itemInstanceId, defs, socketsMap, reusableMap),
   };
 }

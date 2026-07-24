@@ -29,15 +29,10 @@ import type { InventoryView, ItemDetailView, ItemView } from '../../core/invento
 import type { LoadedDefs } from '../../core/manifest.service';
 import type { RollAssessment } from '../../core/rolls';
 import { ItemDetail } from './item-detail';
-import type { PopoverPosition } from './item-detail';
 import { ItemTile } from './item-tile';
 import type { ItemSelection } from './item-tile';
 import { EMPTY_FILTERS, InventoryFilters, isEmptyFilter, matchesFilters } from './inventory-filters';
 import type { FilterFacets, InventoryFilterState } from './inventory-filters';
-
-/** Keep in sync with the .detail-panel width in styles.css. */
-const POPOVER_WIDTH = 340;
-const POPOVER_MARGIN = 8;
 
 const TIER_ORDER = ['S', 'A', 'B', 'C', 'D', 'E', 'F'];
 
@@ -212,7 +207,7 @@ interface FilteredInventory {
       @if (selected(); as s) {
         <app-item-detail
           [detail]="s.detail"
-          [position]="s.position"
+          [anchor]="s.anchorEl"
           [roll]="s.roll"
           (closed)="selected.set(null)"
         />
@@ -237,7 +232,7 @@ export class InventoryPage {
   protected readonly filters = signal<InventoryFilterState>(EMPTY_FILTERS);
   protected readonly selected = signal<{
     detail: ItemDetailView;
-    position: PopoverPosition;
+    anchorEl: HTMLElement;
     roll: RollAssessment | null;
   } | null>(null);
 
@@ -318,7 +313,7 @@ export class InventoryPage {
     const defs = this.defs;
     const profileData = this.profileData;
     if (!defs || !profileData) return;
-    const { item, anchor } = selection;
+    const { item, anchorEl } = selection;
     let categories: readonly SocketCategoryInfo[] = [];
     if (item.instanceId) {
       try {
@@ -336,7 +331,7 @@ export class InventoryPage {
         categories,
         defs.socketCategoryNames,
       ),
-      position: popoverPosition(anchor),
+      anchorEl,
       roll: this.rolls.assess(item),
     });
   }
@@ -379,21 +374,4 @@ export class InventoryPage {
     const state = this.manifest.state();
     return state.kind === 'error' ? state.message : 'Failed to load the item database.';
   }
-}
-
-/** Prefer the tile's right side; flip left when cramped, clamp to the viewport. */
-function popoverPosition(anchor: DOMRect): PopoverPosition {
-  let left = anchor.right + POPOVER_MARGIN;
-  if (left + POPOVER_WIDTH + POPOVER_MARGIN > window.innerWidth) {
-    left = anchor.left - POPOVER_WIDTH - POPOVER_MARGIN;
-  }
-  left = Math.max(
-    POPOVER_MARGIN,
-    Math.min(left, window.innerWidth - POPOVER_WIDTH - POPOVER_MARGIN),
-  );
-  const top = Math.max(
-    POPOVER_MARGIN,
-    Math.min(anchor.top, window.innerHeight - 360),
-  );
-  return { left, top, maxHeight: window.innerHeight - top - POPOVER_MARGIN };
 }

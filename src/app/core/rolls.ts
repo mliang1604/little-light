@@ -16,6 +16,7 @@ export interface SheetWeapon {
   readonly energy?: string;
   readonly frame?: string;
   readonly source?: string;
+  readonly stun?: string;
   readonly enhanceable: boolean;
   readonly columns: SheetWeaponColumns;
   readonly notes?: string;

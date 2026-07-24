@@ -46,6 +46,8 @@ export interface DestinyItemInstance {
   readonly damageType?: number;
   /** Edge of Fate gear tier 1–5; 0 on untiered legacy gear. */
   readonly gearTier?: number;
+  /** DestinyBreakerType: 1 Anti-Barrier, 2 Overload, 3 Unstoppable. */
+  readonly breakerType?: number;
 }
 
 export interface DestinyItemList {
@@ -128,6 +130,12 @@ export const RACE_NAMES: Readonly<Record<number, string>> = {
   0: 'Human',
   1: 'Awoken',
   2: 'Exo',
+};
+
+export const BREAKER_NAMES: Readonly<Record<number, string>> = {
+  1: 'Anti-Barrier',
+  2: 'Overload',
+  3: 'Unstoppable',
 };
 
 export const DAMAGE_TYPE_NAMES: Readonly<Record<number, string>> = {
