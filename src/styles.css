@@ -413,6 +413,23 @@ app-item-tile {
   display: block;
 }
 
+.tile-tiers {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.tile-pip {
+  width: 5px;
+  height: 5px;
+  background: #f0e6c8;
+  clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+  filter: drop-shadow(0 0 1px rgb(0 0 0 / 0.9));
+}
+
 .tile-badge {
   position: absolute;
   right: 0;

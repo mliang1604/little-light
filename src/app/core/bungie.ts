@@ -44,6 +44,8 @@ export interface DestinyItemComponent {
 export interface DestinyItemInstance {
   readonly primaryStat?: { readonly value: number };
   readonly damageType?: number;
+  /** Edge of Fate gear tier 1–5; 0 on untiered legacy gear. */
+  readonly gearTier?: number;
 }
 
 export interface DestinyItemList {
