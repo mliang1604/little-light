@@ -234,6 +234,18 @@ function plugView(defs: ItemDefs, hash: number): ItemPlugView {
   return { hash, name: def?.name ?? `#${hash}`, icon: def?.icon };
 }
 
+/**
+ * Sandbox perks carry the real effect text (catalysts' item description is a
+ * generic masterwork blurb); fall back to the item description without them.
+ */
+export function composePlugDescription(
+  itemDescription: string,
+  sandboxDescriptions: readonly string[],
+): string {
+  const unique = [...new Set(sandboxDescriptions.filter((text) => text.trim().length > 0))];
+  return unique.length > 0 ? unique.join('\n\n') : itemDescription;
+}
+
 export function buildInventoryView(profile: DestinyFullProfile, defs: ItemDefs): InventoryView {
   const instances = profile.itemComponents.instances.data ?? {};
   const equipment = profile.characterEquipment.data ?? {};

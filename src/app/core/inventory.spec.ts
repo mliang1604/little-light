@@ -1,4 +1,10 @@
-import { GEAR_BUCKETS, buildInventoryView, buildItemDetail, toItemView } from './inventory';
+import {
+  GEAR_BUCKETS,
+  buildInventoryView,
+  buildItemDetail,
+  composePlugDescription,
+  toItemView,
+} from './inventory';
 import type {
   DestinyCharacter,
   DestinyFullProfile,
@@ -344,5 +350,27 @@ describe('buildItemDetail', () => {
     expect(detail.perkColumns).toEqual([]);
     expect(detail.mods).toEqual([]);
     expect(detail.item.quantity).toBe(40);
+  });
+});
+
+describe('composePlugDescription', () => {
+  it('prefers sandbox perk text over the generic item description', () => {
+    expect(
+      composePlugDescription('Upgrades this weapon to a Masterwork.', [
+        'At 5 stacks of Markov Chain, switches to the bayonet.',
+      ]),
+    ).toBe('At 5 stacks of Markov Chain, switches to the bayonet.');
+  });
+
+  it('joins and dedupes multiple sandbox descriptions', () => {
+    expect(composePlugDescription('generic', ['Effect A', 'Effect A', '', 'Effect B'])).toBe(
+      'Effect A\n\nEffect B',
+    );
+  });
+
+  it('falls back to the item description when no sandbox text exists', () => {
+    expect(composePlugDescription('Restores your Ghost.', ['', '  '])).toBe(
+      'Restores your Ghost.',
+    );
   });
 });
