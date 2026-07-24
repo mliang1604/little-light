@@ -2,10 +2,10 @@ import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } 
 import { AuthService } from '../../core/auth.service';
 import { BungieApiService } from '../../core/bungie-api.service';
 import { ManifestService } from '../../core/manifest.service';
-import { buildCharacterColumns, buildVaultGroups } from '../../core/inventory';
+import { buildInventoryView } from '../../core/inventory';
 import { BUNGIE_ROOT, BungieApiError, CLASS_NAMES, pickPrimaryMembership } from '../../core/bungie';
 import type { DestinyCharacter, DestinyFullProfile } from '../../core/bungie';
-import type { CharacterColumn, VaultGroup } from '../../core/inventory';
+import type { InventoryView } from '../../core/inventory';
 import { ItemTile } from './item-tile';
 
 @Component({
@@ -47,51 +47,68 @@ import { ItemTile } from './item-tile';
       @if (error(); as message) {
         <p class="error" role="alert">{{ message }}</p>
       }
-      @if (columns(); as cols) {
-        <div class="inv-layout">
-          @for (col of cols; track col.characterId) {
-            <section class="inv-char">
-              <header class="inv-char-header" [style.background-image]="emblemUrl(col.character)">
-                <span class="inv-char-class">{{ classNames[col.character.classType] ?? '?' }}</span>
-                <span class="inv-char-light">✦ {{ col.character.light }}</span>
+      @if (view(); as v) {
+        <div class="inv-workspace">
+          <div class="inv-grid" [style.--char-count]="v.characters.length || 1">
+            @for (c of v.characters; track c.characterId) {
+              <header class="inv-char-header" [style.background-image]="emblemUrl(c.character)">
+                <span class="inv-char-class">{{ classNames[c.character.classType] ?? '?' }}</span>
+                <span class="inv-char-light">✦ {{ c.character.light }}</span>
               </header>
-              @for (bucket of col.buckets; track bucket.hash) {
-                <div class="inv-bucket">
-                  <h3 class="inv-label">{{ bucket.label }}</h3>
+            }
+            <header class="inv-vault-header">
+              <h2>Vault</h2>
+              <span class="inv-vault-count">{{ v.vaultTotal }}</span>
+            </header>
+
+            @for (row of v.rows; track row.hash) {
+              @for (cell of row.perCharacter; track $index) {
+                <div class="inv-cell">
+                  <h3 class="inv-label">{{ row.label }}</h3>
                   <div class="inv-bucket-row">
                     <div class="inv-equipped">
-                      @if (bucket.equipped; as equipped) {
+                      @if (cell.equipped; as equipped) {
                         <app-item-tile [item]="equipped" />
                       } @else {
                         <div class="tile tile-empty"></div>
                       }
                     </div>
                     <div class="inv-stored">
-                      @for (stored of bucket.stored; track stored.instanceId ?? $index) {
+                      @for (stored of cell.stored; track stored.instanceId ?? $index) {
                         <app-item-tile [item]="stored" />
                       }
                     </div>
                   </div>
                 </div>
               }
-            </section>
-          }
-          <section class="inv-vault">
-            <header class="inv-vault-header">
-              <h2>Vault</h2>
-              <span class="inv-vault-count">{{ vaultCount() }}</span>
-            </header>
-            @for (group of vault() ?? []; track group.label) {
-              <h3 class="inv-label">
-                {{ group.label }} <span class="inv-count">{{ group.items.length }}</span>
-              </h3>
-              <div class="vault-grid">
-                @for (stored of group.items; track stored.instanceId ?? $index) {
-                  <app-item-tile [item]="stored" />
-                }
+              <div class="inv-cell inv-vault-cell">
+                <h3 class="inv-label">
+                  {{ row.label }} <span class="inv-count">{{ row.vault.length }}</span>
+                </h3>
+                <div class="vault-grid">
+                  @for (stored of row.vault; track stored.instanceId ?? $index) {
+                    <app-item-tile [item]="stored" />
+                  }
+                </div>
               </div>
             }
-          </section>
+
+            @if (v.otherVault.length > 0) {
+              @for (c of v.characters; track c.characterId) {
+                <div class="inv-cell"></div>
+              }
+              <div class="inv-cell inv-vault-cell">
+                <h3 class="inv-label">
+                  Other <span class="inv-count">{{ v.otherVault.length }}</span>
+                </h3>
+                <div class="vault-grid">
+                  @for (stored of v.otherVault; track stored.instanceId ?? $index) {
+                    <app-item-tile [item]="stored" />
+                  }
+                </div>
+              </div>
+            }
+          </div>
         </div>
       }
     }
@@ -105,25 +122,19 @@ export class InventoryPage implements OnInit {
   protected readonly classNames = CLASS_NAMES;
   protected readonly loading = signal(false);
   protected readonly error = signal<string | null>(null);
-  protected readonly columns = signal<readonly CharacterColumn[] | null>(null);
-  protected readonly vault = signal<readonly VaultGroup[] | null>(null);
+  protected readonly view = signal<InventoryView | null>(null);
 
   protected readonly downloadedMb = computed(() => {
     const state = this.manifest.state();
     return state.kind === 'downloading' ? state.receivedMb.toFixed(0) : '';
   });
 
-  protected readonly vaultCount = computed(
-    () => this.vault()?.reduce((sum, group) => sum + group.items.length, 0) ?? 0,
-  );
-
   async ngOnInit(): Promise<void> {
     if (!this.auth.isSignedIn()) return;
     this.loading.set(true);
     try {
       const [defs, full] = await Promise.all([this.manifest.load(), this.loadProfile()]);
-      this.columns.set(buildCharacterColumns(full, defs));
-      this.vault.set(buildVaultGroups(full, defs));
+      this.view.set(buildInventoryView(full, defs));
     } catch (err) {
       if (err instanceof BungieApiError && err.status === 401) {
         this.auth.signOut();

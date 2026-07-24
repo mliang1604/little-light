@@ -19,22 +19,29 @@ export interface ItemView {
   readonly itemType: string;
 }
 
-export interface BucketView {
-  readonly hash: number;
-  readonly label: string;
+export interface CharacterInfo {
+  readonly characterId: string;
+  readonly character: DestinyCharacter;
+}
+
+export interface CharacterBucketCell {
   readonly equipped?: ItemView;
   readonly stored: readonly ItemView[];
 }
 
-export interface CharacterColumn {
-  readonly characterId: string;
-  readonly character: DestinyCharacter;
-  readonly buckets: readonly BucketView[];
+/** One horizontal band: a gear bucket across every character plus the vault. */
+export interface BucketRow {
+  readonly hash: number;
+  readonly label: string;
+  readonly perCharacter: readonly CharacterBucketCell[];
+  readonly vault: readonly ItemView[];
 }
 
-export interface VaultGroup {
-  readonly label: string;
-  readonly items: readonly ItemView[];
+export interface InventoryView {
+  readonly characters: readonly CharacterInfo[];
+  readonly rows: readonly BucketRow[];
+  readonly otherVault: readonly ItemView[];
+  readonly vaultTotal: number;
 }
 
 /** Weapon and armor buckets, in DIM's display order. */
@@ -82,56 +89,48 @@ function byPowerThenName(a: ItemView, b: ItemView): number {
   return (b.power ?? 0) - (a.power ?? 0) || a.name.localeCompare(b.name);
 }
 
-export function buildCharacterColumns(
-  profile: DestinyFullProfile,
-  defs: ItemDefs,
-): CharacterColumn[] {
-  const characters = profile.characters.data ?? {};
+export function buildInventoryView(profile: DestinyFullProfile, defs: ItemDefs): InventoryView {
   const instances = profile.itemComponents.instances.data ?? {};
   const equipment = profile.characterEquipment.data ?? {};
   const inventories = profile.characterInventories.data ?? {};
 
-  return Object.entries(characters)
+  const characters: CharacterInfo[] = Object.entries(profile.characters.data ?? {})
     .sort(([, a], [, b]) => Date.parse(b.dateLastPlayed) - Date.parse(a.dateLastPlayed))
-    .map(([characterId, character]) => {
-      const equipped = equipment[characterId]?.items ?? [];
-      const carried = inventories[characterId]?.items ?? [];
-      const buckets = GEAR_BUCKETS.map(({ hash, label }) => {
-        const equippedItem = equipped.find((i) => i.bucketHash === hash);
-        const stored = carried
-          .filter((i) => i.bucketHash === hash)
-          .map((i) => toItemView(i, defs, instances))
-          .sort(byPowerThenName);
-        return {
-          hash,
-          label,
-          equipped: equippedItem ? toItemView(equippedItem, defs, instances) : undefined,
-          stored,
-        };
-      });
-      return { characterId, character, buckets };
-    });
-}
+    .map(([characterId, character]) => ({ characterId, character }));
 
-export function buildVaultGroups(profile: DestinyFullProfile, defs: ItemDefs): VaultGroup[] {
-  const instances = profile.itemComponents.instances.data ?? {};
   const vaultItems = (profile.profileInventory.data?.items ?? []).filter(
     (i) => i.bucketHash === VAULT_BUCKET,
   );
-
-  const groups = new Map<number, ItemView[]>(GEAR_BUCKETS.map(({ hash }) => [hash, []]));
-  const other: ItemView[] = [];
+  const vaultByBucket = new Map<number, ItemView[]>(GEAR_BUCKETS.map(({ hash }) => [hash, []]));
+  const otherVault: ItemView[] = [];
   for (const item of vaultItems) {
     const view = toItemView(item, defs, instances);
-    const def = defs.get(item.itemHash);
-    (groups.get(def?.bucket ?? 0) ?? other).push(view);
+    (vaultByBucket.get(defs.get(item.itemHash)?.bucket ?? 0) ?? otherVault).push(view);
   }
 
-  const result: VaultGroup[] = [];
-  for (const { hash, label } of GEAR_BUCKETS) {
-    const items = groups.get(hash) ?? [];
-    if (items.length > 0) result.push({ label, items: [...items].sort(byPowerThenName) });
-  }
-  if (other.length > 0) result.push({ label: 'Other', items: [...other].sort(byPowerThenName) });
-  return result;
+  const rows: BucketRow[] = GEAR_BUCKETS.map(({ hash, label }) => ({
+    hash,
+    label,
+    perCharacter: characters.map(({ characterId }) => {
+      const equippedItem = (equipment[characterId]?.items ?? []).find(
+        (i) => i.bucketHash === hash,
+      );
+      const stored = (inventories[characterId]?.items ?? [])
+        .filter((i) => i.bucketHash === hash)
+        .map((i) => toItemView(i, defs, instances))
+        .sort(byPowerThenName);
+      return {
+        equipped: equippedItem ? toItemView(equippedItem, defs, instances) : undefined,
+        stored,
+      };
+    }),
+    vault: (vaultByBucket.get(hash) ?? []).sort(byPowerThenName),
+  }));
+
+  return {
+    characters,
+    rows,
+    otherVault: otherVault.sort(byPowerThenName),
+    vaultTotal: vaultItems.length,
+  };
 }

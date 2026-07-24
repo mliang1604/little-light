@@ -82,8 +82,7 @@ code {
 .masthead,
 .notice,
 .signin-card,
-.inv-char,
-.inv-vault {
+.inv-workspace {
   background:
     linear-gradient(rgb(255 255 255 / 0.05), rgb(255 255 255 / 0.05)),
     rgb(13 17 24 / 0.52);
@@ -353,20 +352,29 @@ button[type='submit']:disabled {
   margin: 0;
 }
 
-/* Inventory */
+/* Inventory — one grid where each gear bucket is a row band spanning the
+   character columns and the vault, so categories stay aligned: the row is
+   as tall as its tallest cell (usually the vault's). */
 
-.inv-layout {
-  display: flex;
-  gap: 1.25rem;
-  align-items: flex-start;
+.inv-workspace {
+  padding: 1rem 1.25rem 1.25rem;
   overflow-x: auto;
-  padding-bottom: 1rem;
 }
 
-.inv-char {
-  flex: 0 0 auto;
-  width: calc(var(--tile-lg) + 6px + 3 * var(--tile) + 2 * var(--tile-gap) + 1.8rem + 2px);
-  padding: 0.9rem;
+.inv-grid {
+  display: grid;
+  grid-template-columns: repeat(var(--char-count, 3), max-content) minmax(360px, 1fr);
+  column-gap: 1.25rem;
+  align-items: start;
+}
+
+.inv-cell {
+  padding-bottom: 0.5rem;
+}
+
+.inv-vault-cell {
+  border-left: 1px solid var(--border);
+  padding-left: 1.25rem;
 }
 
 .inv-char-header {
@@ -427,18 +435,14 @@ button[type='submit']:disabled {
   gap: var(--tile-gap);
 }
 
-.inv-vault {
-  flex: 1 1 auto;
-  min-width: 380px;
-  padding: 0.9rem 1.1rem 1.1rem;
-}
-
 .inv-vault-header {
+  height: 52px;
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 0.6rem;
-  border-bottom: 1px solid var(--border);
-  padding-bottom: 0.5rem;
+  border-left: 1px solid var(--border);
+  padding-left: 1.25rem;
+  margin-bottom: 0.5rem;
 }
 
 .inv-vault-header h2 {
