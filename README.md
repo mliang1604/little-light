@@ -9,7 +9,8 @@ A lightweight companion app for [Destiny 2](https://www.bungie.net/7/en/Destiny/
 - **Player search** — find any player by full Bungie Name (`Guardian#1234`), cross-save aware
 - **Character overview** — class, race, Power level, emblem, and hours played per character
 - **Sign in with Bungie.net** — OAuth (public client) to view your own profile; if your Bungie profile has multiple Destiny 2 platform accounts (no cross save), a header switcher swaps between them
-- **Inventory** — DIM-style view of your characters' equipped/carried weapons and armor plus the vault, in aligned bucket bands with Power levels, gear-tier pips, and rarity borders. Each character shows their Postmaster (engram slots and lost items) at the top. Click any item for a detail dialog with its stats and equipped perks/mods. Item names and icons come from Bungie's manifest, downloaded once and cached in IndexedDB per game version.
+- **Inventory** — DIM-style view of your characters' equipped/carried weapons and armor plus the vault, in aligned bucket bands with Power levels, gear-tier pips, and rarity borders. Each character shows their Postmaster (engram slots and lost items) at the top. Click any item for a detail popover with its stats and perks/mods. Item names and icons come from Bungie's manifest, downloaded once and cached in IndexedDB per game version.
+- **Endgame Analysis roll filtering** — weapons are scored against the community "Destiny 2: Endgame Analysis" spreadsheet: tiles show the sheet tier and a ★ when your roll has the recommended perks available in distinct columns (god roll), the item popover shows tier/rank/source/notes with recommended perks ringed, and a filter bar (text + chips for tier, match quality, type, element, slot, gear tier, source) hides everything else. A **Shopping** page renders the sheet's farm list with owned/satisfied checks against your inventory.
 
 ## Stack
 
@@ -53,6 +54,16 @@ npm run start:http # http variant — UI only; Bungie rejects its Origin (error 
 ```
 
 Bungie rejects any request whose `Origin` doesn't exactly match the registered `https://localhost:4200` (`OriginHeaderDoesNotMatchKey`), and OAuth redirect URLs must be `https` — so the https dev server is the default.
+
+## Endgame Analysis data
+
+The roll recommendations ship as [public/endgame-analysis.json](public/endgame-analysis.json), generated from the community spreadsheet. To refresh after the sheet updates:
+
+```bash
+npm run sheet:convert -- "path/to/Destiny 2_ Endgame Analysis.xlsx"
+```
+
+(The path defaults to `C:\Users\mlian\Downloads\Destiny 2_ Endgame Analysis.xlsx`.) Check the printed per-tab counts, then commit the regenerated JSON through a PR. The converter reads the 20 live weapon tabs plus the Shopping List, maps columns by their header names, and splits newline-separated option cells.
 
 ## Deployment
 

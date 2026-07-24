@@ -7,6 +7,7 @@
     <nav class="nav">
       <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">Search</a>
       <a routerLink="/inventory" routerLinkActive="active">Inventory</a>
+      <a routerLink="/shopping" routerLinkActive="active">Shopping</a>
       <a routerLink="/me" routerLinkActive="active">Your Guardian</a>
       @if (auth.isSignedIn() && account.memberships().length > 1) {
         <select class="account-select" aria-label="Destiny account" (change)="onAccountChange($event)">
