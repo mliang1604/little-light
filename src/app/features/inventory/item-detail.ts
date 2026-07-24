@@ -1,7 +1,17 @@
-import { ChangeDetectionStrategy, Component, inject, input, output, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+  input,
+  output,
+  signal,
+} from '@angular/core';
 import { BUNGIE_ROOT } from '../../core/bungie';
 import { BungieApiService } from '../../core/bungie-api.service';
 import { composePlugDescription } from '../../core/inventory';
+import { normalizeName } from '../../core/rolls';
+import type { RollAssessment } from '../../core/rolls';
 import type { ItemDetailView, ItemPlugView } from '../../core/inventory';
 
 /** Viewport-fixed placement computed from the clicked tile's rect. */
@@ -57,6 +67,26 @@ const PLUG_POPOVER_WIDTH = 260;
           </button>
         </header>
 
+        @if (roll(); as r) {
+          <div class="detail-sheet">
+            <p class="detail-sheet-line">
+              Endgame Analysis: <strong>{{ r.weapon.tier ?? '?' }}-tier</strong>
+              @if (r.weapon.rank) {
+                <span>#{{ r.weapon.rank }}</span>
+              }
+              @if (r.weapon.source) {
+                <span>· {{ r.weapon.source }}</span>
+              }
+              @if (r.isGodRoll) {
+                <span class="detail-god">★ god roll</span>
+              }
+            </p>
+            @if (r.weapon.notes) {
+              <p class="detail-sheet-notes">{{ r.weapon.notes }}</p>
+            }
+          </div>
+        }
+
         @if (detail().stats.length > 0) {
           <dl class="detail-stats">
             @for (stat of detail().stats; track stat.name) {
@@ -87,6 +117,7 @@ const PLUG_POPOVER_WIDTH = 260;
                     [class.plug-active]="perk.active"
                     [class.plug-inactive]="!perk.active"
                     [class.plug-selected]="plugInfo()?.hash === perk.hash"
+                    [class.plug-recommended]="isRecommended(perk.name)"
                     [title]="perk.name"
                     (click)="showPlugInfo(perk, $event)"
                   >
@@ -147,12 +178,26 @@ const PLUG_POPOVER_WIDTH = 260;
 export class ItemDetail {
   readonly detail = input.required<ItemDetailView>();
   readonly position = input.required<PopoverPosition>();
+  readonly roll = input<RollAssessment | null>(null);
   readonly closed = output<void>();
 
   protected readonly root = BUNGIE_ROOT;
   protected readonly plugInfo = signal<PlugInfo | null>(null);
 
   private readonly api = inject(BungieApiService);
+
+  private readonly recommendedNames = computed(() => {
+    const weapon = this.roll()?.weapon;
+    if (!weapon) return new Set<string>();
+    const { barrel, mag, perk1, perk2, origin } = weapon.columns;
+    return new Set(
+      [...barrel, ...mag, ...perk1, ...perk2, ...origin].map((name) => normalizeName(name)),
+    );
+  });
+
+  protected isRecommended(name: string): boolean {
+    return this.recommendedNames().has(normalizeName(name));
+  }
 
   protected onEscape(): void {
     if (this.plugInfo()) {

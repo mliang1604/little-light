@@ -20,6 +20,10 @@ export interface ItemView {
   readonly gearTier?: number;
   readonly quantity: number;
   readonly itemType: string;
+  /** The gear bucket this item belongs to per its definition (not where it sits). */
+  readonly bucket: number;
+  /** DamageType enum value; 0/absent for armor and non-weapons. */
+  readonly damageType?: number;
   /** Option names per socket (plugged + reusable), for roll matching and perk search. */
   readonly socketOptionNames?: readonly (readonly string[])[];
 }
@@ -105,6 +109,8 @@ export function toItemView(
     gearTier: instance?.gearTier || undefined,
     quantity: item.quantity,
     itemType: def.itemType,
+    bucket: def.bucket,
+    damageType: instance?.damageType || undefined,
     socketOptionNames: buildSocketOptionNames(item.itemInstanceId, defs, socketsMap, reusableMap),
   };
 }
