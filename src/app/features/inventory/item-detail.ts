@@ -3,7 +3,14 @@ import { BUNGIE_ROOT } from '../../core/bungie';
 import { BungieApiService } from '../../core/bungie-api.service';
 import type { ItemDetailView, ItemPlugView } from '../../core/inventory';
 
-interface PlugInfo {
+/** Viewport-fixed placement computed from the clicked tile's rect. */
+export interface PopoverPosition {
+  readonly left: number;
+  readonly top: number;
+  readonly maxHeight: number;
+}
+
+interface PlugInfo extends PopoverPosition {
   readonly hash: number;
   readonly name: string;
   readonly icon?: string;
@@ -11,17 +18,22 @@ interface PlugInfo {
   readonly loading: boolean;
 }
 
+const PLUG_POPOVER_WIDTH = 260;
+
 @Component({
   selector: 'app-item-detail',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  host: { '(document:keydown.escape)': 'closed.emit()' },
+  host: { '(document:keydown.escape)': 'onEscape()' },
   template: `
     <div class="detail-backdrop" (click)="closed.emit()">
       <aside
         class="detail-panel"
         role="dialog"
         [attr.aria-label]="detail().item.name"
-        (click)="$event.stopPropagation()"
+        [style.left.px]="position().left"
+        [style.top.px]="position().top"
+        [style.max-height.px]="position().maxHeight"
+        (click)="onPanelClick($event)"
       >
         <header [class]="'detail-header tier-h-' + detail().item.tier">
           <div class="detail-title">
@@ -75,7 +87,7 @@ interface PlugInfo {
                     [class.plug-inactive]="!perk.active"
                     [class.plug-selected]="plugInfo()?.hash === perk.hash"
                     [title]="perk.name"
-                    (click)="showPlugInfo(perk)"
+                    (click)="showPlugInfo(perk, $event)"
                   >
                     @if (perk.icon; as icon) {
                       <img [src]="root + icon" [alt]="perk.name" loading="lazy" />
@@ -98,7 +110,7 @@ interface PlugInfo {
                 class="plug"
                 [class.plug-selected]="plugInfo()?.hash === plug.hash"
                 [title]="plug.name"
-                (click)="showPlugInfo(plug)"
+                (click)="showPlugInfo(plug, $event)"
               >
                 @if (plug.icon; as icon) {
                   <img [src]="root + icon" [alt]="plug.name" loading="lazy" />
@@ -109,24 +121,31 @@ interface PlugInfo {
             }
           </div>
         }
-
-        @if (plugInfo(); as info) {
-          <div class="perk-info">
-            @if (info.icon; as icon) {
-              <img class="perk-info-icon" [src]="root + icon" alt="" />
-            }
-            <div>
-              <h4>{{ info.name }}</h4>
-              <p>{{ info.loading ? 'Loading…' : info.description }}</p>
-            </div>
-          </div>
-        }
       </aside>
+
+      @if (plugInfo(); as info) {
+        <div
+          class="plug-popover"
+          [style.left.px]="info.left"
+          [style.top.px]="info.top"
+          [style.max-height.px]="info.maxHeight"
+          (click)="$event.stopPropagation()"
+        >
+          <header class="plug-popover-header">
+            @if (info.icon; as icon) {
+              <img class="plug-popover-icon" [src]="root + icon" alt="" />
+            }
+            <h4>{{ info.name }}</h4>
+          </header>
+          <p>{{ info.loading ? 'Loading…' : info.description }}</p>
+        </div>
+      }
     </div>
   `,
 })
 export class ItemDetail {
   readonly detail = input.required<ItemDetailView>();
+  readonly position = input.required<PopoverPosition>();
   readonly closed = output<void>();
 
   protected readonly root = BUNGIE_ROOT;
@@ -134,12 +153,28 @@ export class ItemDetail {
 
   private readonly api = inject(BungieApiService);
 
-  protected async showPlugInfo(plug: ItemPlugView): Promise<void> {
+  protected onEscape(): void {
+    if (this.plugInfo()) {
+      this.plugInfo.set(null);
+    } else {
+      this.closed.emit();
+    }
+  }
+
+  protected onPanelClick(event: Event): void {
+    event.stopPropagation();
+    this.plugInfo.set(null);
+  }
+
+  protected async showPlugInfo(plug: ItemPlugView, event: Event): Promise<void> {
+    event.stopPropagation();
     if (this.plugInfo()?.hash === plug.hash) {
       this.plugInfo.set(null);
       return;
     }
-    this.plugInfo.set({ ...plug, description: '', loading: true });
+    const anchor = (event.currentTarget as HTMLElement).getBoundingClientRect();
+    const placement = plugPopoverPosition(anchor);
+    this.plugInfo.set({ ...plug, ...placement, description: '', loading: true });
     let description: string;
     try {
       const extras = await this.api.getItemExtras(plug.hash);
@@ -148,7 +183,19 @@ export class ItemDetail {
       description = 'Could not load the description.';
     }
     if (this.plugInfo()?.hash === plug.hash) {
-      this.plugInfo.set({ ...plug, description, loading: false });
+      this.plugInfo.set({ ...plug, ...placement, description, loading: false });
     }
   }
+}
+
+/** Prefer the plug's right side; flip left when cramped, clamp to the viewport. */
+function plugPopoverPosition(anchor: DOMRect): PopoverPosition {
+  const margin = 6;
+  let left = anchor.right + margin;
+  if (left + PLUG_POPOVER_WIDTH + margin > window.innerWidth) {
+    left = anchor.left - PLUG_POPOVER_WIDTH - margin;
+  }
+  left = Math.max(margin, Math.min(left, window.innerWidth - PLUG_POPOVER_WIDTH - margin));
+  const top = Math.max(margin, Math.min(anchor.top, window.innerHeight - 220));
+  return { left, top, maxHeight: window.innerHeight - top - margin };
 }

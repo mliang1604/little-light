@@ -220,6 +220,9 @@ export function buildItemDetail(
   sockets.forEach((socket, index) => {
     if (perkIndexSet.has(index)) return;
     if (!socket.isEnabled || socket.isVisible === false || socket.plugHash == null) return;
+    const def = defs.get(socket.plugHash);
+    // Kill/Crucible trackers are cosmetic counters, not gear choices — noise here.
+    if (def && /tracker/i.test(`${def.name} ${def.itemType}`)) return;
     mods.push(plugView(defs, socket.plugHash));
   });
 

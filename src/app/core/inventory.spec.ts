@@ -24,6 +24,7 @@ const DEFS: ItemDefs = new Map<number, ItemDefLite>([
   [3, def({ name: 'Zeta First' })],
   [4, def({ name: 'Helm', bucket: HELMET, itemType: 'Helmet' })],
   [5, def({ name: 'Shards', tier: 3, bucket: 0, itemType: 'Material' })],
+  [6, def({ name: 'Kill Tracker', tier: 2, bucket: 0, itemType: 'Weapon Tracker' })],
 ]);
 
 function item(
@@ -312,6 +313,28 @@ describe('buildItemDetail', () => {
 
     expect(detail.perkColumns).toEqual([]);
     expect(detail.mods.map((p) => p.name)).toEqual(['Auto Low', '#999']);
+  });
+
+  it('excludes kill trackers from the mods list', () => {
+    const detail = buildItemDetail(
+      instanced,
+      profile({
+        sockets: {
+          i1: {
+            sockets: [
+              { plugHash: 4, isEnabled: true },
+              { plugHash: 6, isEnabled: true },
+            ],
+          },
+        },
+      }),
+      DEFS,
+      STAT_NAMES,
+      [],
+      CATEGORY_NAMES,
+    );
+
+    expect(detail.mods.map((p) => p.name)).toEqual(['Helm']);
   });
 
   it('returns empty sections for non-instanced items', () => {

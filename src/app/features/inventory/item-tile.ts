@@ -2,6 +2,12 @@ import { ChangeDetectionStrategy, Component, computed, input, output } from '@an
 import { BUNGIE_ROOT } from '../../core/bungie';
 import type { ItemView } from '../../core/inventory';
 
+/** A clicked item plus where its tile sits, so the detail popover can anchor to it. */
+export interface ItemSelection {
+  readonly item: ItemView;
+  readonly anchor: DOMRect;
+}
+
 const MAX_GEAR_TIER = 5;
 
 @Component({
@@ -13,8 +19,8 @@ const MAX_GEAR_TIER = 5;
       [title]="tooltip()"
       role="button"
       tabindex="0"
-      (click)="selected.emit(item())"
-      (keydown.enter)="selected.emit(item())"
+      (click)="onSelect($event)"
+      (keydown.enter)="onSelect($event)"
     >
       @if (item().icon; as icon) {
         <img class="tile-icon" [src]="root + icon" [alt]="item().name" loading="lazy" />
@@ -39,9 +45,14 @@ const MAX_GEAR_TIER = 5;
 })
 export class ItemTile {
   readonly item = input.required<ItemView>();
-  readonly selected = output<ItemView>();
+  readonly selected = output<ItemSelection>();
 
   protected readonly root = BUNGIE_ROOT;
+
+  protected onSelect(event: Event): void {
+    const anchor = (event.currentTarget as HTMLElement).getBoundingClientRect();
+    this.selected.emit({ item: this.item(), anchor });
+  }
 
   protected readonly pips = computed(() => {
     const gearTier = this.item().gearTier ?? 0;

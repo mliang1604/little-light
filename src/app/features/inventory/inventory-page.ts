@@ -27,7 +27,13 @@ import type {
 import type { InventoryView, ItemDetailView, ItemView } from '../../core/inventory';
 import type { LoadedDefs } from '../../core/manifest.service';
 import { ItemDetail } from './item-detail';
+import type { PopoverPosition } from './item-detail';
 import { ItemTile } from './item-tile';
+import type { ItemSelection } from './item-tile';
+
+/** Keep in sync with the .detail-panel width in styles.css. */
+const POPOVER_WIDTH = 340;
+const POPOVER_MARGIN = 8;
 
 @Component({
   selector: 'app-inventory-page',
@@ -162,8 +168,8 @@ import { ItemTile } from './item-tile';
           </div>
         </div>
       }
-      @if (selected(); as detail) {
-        <app-item-detail [detail]="detail" (closed)="selected.set(null)" />
+      @if (selected(); as s) {
+        <app-item-detail [detail]="s.detail" [position]="s.position" (closed)="selected.set(null)" />
       }
     }
   `,
@@ -181,7 +187,10 @@ export class InventoryPage {
   protected readonly loading = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly view = signal<InventoryView | null>(null);
-  protected readonly selected = signal<ItemDetailView | null>(null);
+  protected readonly selected = signal<{
+    detail: ItemDetailView;
+    position: PopoverPosition;
+  } | null>(null);
 
   private defs: LoadedDefs | null = null;
   private profileData: DestinyFullProfile | null = null;
@@ -236,10 +245,11 @@ export class InventoryPage {
     }
   }
 
-  protected async openDetail(item: ItemView): Promise<void> {
+  protected async openDetail(selection: ItemSelection): Promise<void> {
     const defs = this.defs;
     const profileData = this.profileData;
     if (!defs || !profileData) return;
+    const { item, anchor } = selection;
     let categories: readonly SocketCategoryInfo[] = [];
     if (item.instanceId) {
       try {
@@ -248,9 +258,17 @@ export class InventoryPage {
         // Without the socket layout, every plug falls back to the mods list.
       }
     }
-    this.selected.set(
-      buildItemDetail(item, profileData, defs.items, defs.statNames, categories, defs.socketCategoryNames),
-    );
+    this.selected.set({
+      detail: buildItemDetail(
+        item,
+        profileData,
+        defs.items,
+        defs.statNames,
+        categories,
+        defs.socketCategoryNames,
+      ),
+      position: popoverPosition(anchor),
+    });
   }
 
   protected emblemUrl(character: DestinyCharacter): string {
@@ -261,4 +279,21 @@ export class InventoryPage {
     const state = this.manifest.state();
     return state.kind === 'error' ? state.message : 'Failed to load the item database.';
   }
+}
+
+/** Prefer the tile's right side; flip left when cramped, clamp to the viewport. */
+function popoverPosition(anchor: DOMRect): PopoverPosition {
+  let left = anchor.right + POPOVER_MARGIN;
+  if (left + POPOVER_WIDTH + POPOVER_MARGIN > window.innerWidth) {
+    left = anchor.left - POPOVER_WIDTH - POPOVER_MARGIN;
+  }
+  left = Math.max(
+    POPOVER_MARGIN,
+    Math.min(left, window.innerWidth - POPOVER_WIDTH - POPOVER_MARGIN),
+  );
+  const top = Math.max(
+    POPOVER_MARGIN,
+    Math.min(anchor.top, window.innerHeight - 360),
+  );
+  return { left, top, maxHeight: window.innerHeight - top - POPOVER_MARGIN };
 }
