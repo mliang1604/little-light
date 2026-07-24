@@ -1,4 +1,4 @@
-import { buildCharacterColumns, buildVaultGroups, toItemView } from './inventory';
+import { GEAR_BUCKETS, buildInventoryView, toItemView } from './inventory';
 import type {
   DestinyCharacter,
   DestinyFullProfile,
@@ -92,9 +92,9 @@ describe('toItemView', () => {
   });
 });
 
-describe('buildCharacterColumns', () => {
-  it('orders characters by last played and maps equipped + stored per bucket', () => {
-    const result = buildCharacterColumns(
+describe('buildInventoryView', () => {
+  it('orders characters by last played and maps equipped + stored per bucket cell', () => {
+    const view = buildInventoryView(
       profile({
         characters: {
           older: character('2026-01-01T00:00:00Z'),
@@ -102,11 +102,7 @@ describe('buildCharacterColumns', () => {
         },
         equipment: { newer: [item(2, KINETIC, 'eq')], older: [] },
         inventories: {
-          newer: [
-            item(1, KINETIC, 'low'),
-            item(3, KINETIC, 'high'),
-            item(4, HELMET, 'helm'),
-          ],
+          newer: [item(1, KINETIC, 'low'), item(3, KINETIC, 'high'), item(4, HELMET, 'helm')],
           older: [],
         },
         instances: {
@@ -119,21 +115,26 @@ describe('buildCharacterColumns', () => {
       DEFS,
     );
 
-    expect(result.map((c) => c.characterId)).toEqual(['newer', 'older']);
+    expect(view.characters.map((c) => c.characterId)).toEqual(['newer', 'older']);
 
-    const kinetic = result[0]!.buckets.find((b) => b.hash === KINETIC)!;
-    expect(kinetic.equipped?.name).toBe('Auto High');
-    expect(kinetic.stored.map((i) => i.name)).toEqual(['Zeta First', 'Auto Low']);
+    const kinetic = view.rows.find((r) => r.hash === KINETIC)!;
+    expect(kinetic.perCharacter).toHaveLength(2);
+    expect(kinetic.perCharacter[0]!.equipped?.name).toBe('Auto High');
+    expect(kinetic.perCharacter[0]!.stored.map((i) => i.name)).toEqual(['Zeta First', 'Auto Low']);
+    expect(kinetic.perCharacter[1]!.equipped).toBeUndefined();
+    expect(kinetic.perCharacter[1]!.stored).toEqual([]);
 
-    const helmet = result[0]!.buckets.find((b) => b.hash === HELMET)!;
-    expect(helmet.stored.map((i) => i.name)).toEqual(['Helm']);
-    expect(helmet.equipped).toBeUndefined();
+    const helmet = view.rows.find((r) => r.hash === HELMET)!;
+    expect(helmet.perCharacter[0]!.stored.map((i) => i.name)).toEqual(['Helm']);
   });
-});
 
-describe('buildVaultGroups', () => {
-  it('groups vault items by their definition bucket, sorted by power then name', () => {
-    const result = buildVaultGroups(
+  it('always emits every gear bucket row so bands stay aligned', () => {
+    const view = buildInventoryView(profile({}), DEFS);
+    expect(view.rows.map((r) => r.hash)).toEqual(GEAR_BUCKETS.map((b) => b.hash));
+  });
+
+  it('groups vault items by definition bucket, sorted by power then name', () => {
+    const view = buildInventoryView(
       profile({
         vault: [
           item(1, VAULT, 'v1'),
@@ -150,13 +151,19 @@ describe('buildVaultGroups', () => {
       DEFS,
     );
 
-    expect(result.map((g) => g.label)).toEqual(['Kinetic', 'Helmet', 'Other']);
-    expect(result[0]!.items.map((i) => i.name)).toEqual(['Auto Low', 'Zeta First']);
-    expect(result[2]!.items[0]).toMatchObject({ name: 'Shards', quantity: 40 });
+    const kinetic = view.rows.find((r) => r.hash === KINETIC)!;
+    expect(kinetic.vault.map((i) => i.name)).toEqual(['Auto Low', 'Zeta First']);
+    const helmet = view.rows.find((r) => r.hash === HELMET)!;
+    expect(helmet.vault.map((i) => i.name)).toEqual(['Helm']);
+    expect(view.otherVault).toHaveLength(1);
+    expect(view.otherVault[0]).toMatchObject({ name: 'Shards', quantity: 40 });
+    expect(view.vaultTotal).toBe(4);
   });
 
   it('ignores items not stored in the vault bucket', () => {
-    const result = buildVaultGroups(profile({ vault: [item(1, KINETIC, 'v1')] }), DEFS);
-    expect(result).toEqual([]);
+    const view = buildInventoryView(profile({ vault: [item(1, KINETIC, 'v1')] }), DEFS);
+    expect(view.vaultTotal).toBe(0);
+    expect(view.rows.every((r) => r.vault.length === 0)).toBe(true);
+    expect(view.otherVault).toEqual([]);
   });
 });
