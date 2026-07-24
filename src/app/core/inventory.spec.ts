@@ -109,6 +109,12 @@ describe('toItemView', () => {
     expect(view.gearTier).toBeUndefined();
   });
 
+  it('carries the intrinsic champion breaker type', () => {
+    const view = toItemView(item(2, KINETIC, 'inst-1'), DEFS, { 'inst-1': { breakerType: 3 } });
+    expect(view.breakerType).toBe(3);
+    expect(toItemView(item(2, KINETIC, 'inst-1'), DEFS, {}).breakerType).toBeUndefined();
+  });
+
   it('collects per-socket option names from plugged and reusable plugs', () => {
     const view = toItemView(
       item(2, KINETIC, 'inst-1'),

@@ -92,6 +92,7 @@ function parseWeaponTab(tab, type) {
       energy: clean(cell(row, 'Energy')) || undefined,
       frame: clean(cell(row, 'Frame')) || undefined,
       source: clean(cell(row, 'Source')) || undefined,
+      stun: clean(cell(row, 'Stun')) || undefined,
       enhanceable: clean(cell(row, '⬆️')) === 'Yes',
       columns: {
         barrel: splitCell(cell(row, 'Barrel')),

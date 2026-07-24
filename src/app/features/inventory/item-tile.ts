@@ -3,10 +3,10 @@ import { BUNGIE_ROOT } from '../../core/bungie';
 import type { ItemView } from '../../core/inventory';
 import type { RollAssessment } from '../../core/rolls';
 
-/** A clicked item plus where its tile sits, so the detail popover can anchor to it. */
+/** A clicked item plus its tile element, so the detail popover can anchor and follow it. */
 export interface ItemSelection {
   readonly item: ItemView;
-  readonly anchor: DOMRect;
+  readonly anchorEl: HTMLElement;
 }
 
 const MAX_GEAR_TIER = 5;
@@ -63,8 +63,7 @@ export class ItemTile {
   protected readonly root = BUNGIE_ROOT;
 
   protected onSelect(event: Event): void {
-    const anchor = (event.currentTarget as HTMLElement).getBoundingClientRect();
-    this.selected.emit({ item: this.item(), anchor });
+    this.selected.emit({ item: this.item(), anchorEl: event.currentTarget as HTMLElement });
   }
 
   protected readonly perfect = computed(() => this.roll()?.isPerfectRoll ?? false);
