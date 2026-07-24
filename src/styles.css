@@ -68,8 +68,10 @@ code {
   min-height: 100vh;
 }
 
+/* The inventory is a workspace page — let it use the whole viewport;
+   the vault grid auto-fills whatever width is available. */
 .shell:has(app-inventory-page) {
-  max-width: 1560px;
+  max-width: none;
 }
 
 /* Glass panels — faux glass for large/static panels: over a static gradient
