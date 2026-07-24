@@ -29,6 +29,12 @@ export interface CharacterBucketCell {
   readonly stored: readonly ItemView[];
 }
 
+/** Per-character postmaster: engram slots plus lost items, in arrival order. */
+export interface PostmasterCell {
+  readonly engrams: readonly ItemView[];
+  readonly lostItems: readonly ItemView[];
+}
+
 /** One horizontal band: a gear bucket across every character plus the vault. */
 export interface BucketRow {
   readonly hash: number;
@@ -39,6 +45,7 @@ export interface BucketRow {
 
 export interface InventoryView {
   readonly characters: readonly CharacterInfo[];
+  readonly postmaster: readonly PostmasterCell[];
   readonly rows: readonly BucketRow[];
   readonly otherVault: readonly ItemView[];
   readonly vaultTotal: number;
@@ -58,6 +65,12 @@ export const GEAR_BUCKETS: readonly { readonly hash: number; readonly label: str
 
 /** Everything in the vault sits in the General bucket; its definition says where it belongs. */
 const VAULT_BUCKET = 138197802;
+
+const ENGRAM_BUCKET = 375726501;
+const POSTMASTER_BUCKET = 215593132;
+
+export const ENGRAM_CAPACITY = 10;
+export const POSTMASTER_CAPACITY = 21;
 
 const FALLBACK_DEF: ItemDefLite = { name: 'Unknown item', tier: 0, bucket: 0, itemType: '' };
 
@@ -127,8 +140,21 @@ export function buildInventoryView(profile: DestinyFullProfile, defs: ItemDefs):
     vault: (vaultByBucket.get(hash) ?? []).sort(byPowerThenName),
   }));
 
+  const postmaster: PostmasterCell[] = characters.map(({ characterId }) => {
+    const items = inventories[characterId]?.items ?? [];
+    return {
+      engrams: items
+        .filter((i) => i.bucketHash === ENGRAM_BUCKET)
+        .map((i) => toItemView(i, defs, instances)),
+      lostItems: items
+        .filter((i) => i.bucketHash === POSTMASTER_BUCKET)
+        .map((i) => toItemView(i, defs, instances)),
+    };
+  });
+
   return {
     characters,
+    postmaster,
     rows,
     otherVault: otherVault.sort(byPowerThenName),
     vaultTotal: vaultItems.length,
