@@ -14,12 +14,16 @@ import type {
 /** DestinyComponentType values: 100 = Profiles, 200 = Characters. */
 const PROFILE_COMPONENTS = '100,200';
 
-/** Adds 102 ProfileInventories (vault), 201 CharacterInventories, 205 CharacterEquipment, 300 ItemInstances. */
-const INVENTORY_COMPONENTS = '100,102,200,201,205,300';
+/**
+ * Adds 102 ProfileInventories (vault), 201 CharacterInventories, 205 CharacterEquipment,
+ * 300 ItemInstances, 304 ItemStats, 305 ItemSockets.
+ */
+const INVENTORY_COMPONENTS = '100,102,200,201,205,300,304,305';
 
 export interface ManifestInfo {
   readonly version: string;
   readonly itemLitePath: string;
+  readonly statDefPath: string;
 }
 
 interface RawManifestResponse {
@@ -65,12 +69,13 @@ export class BungieApiService {
 
   async getManifestInfo(): Promise<ManifestInfo> {
     const manifest = await this.request<RawManifestResponse>('GET', '/Destiny2/Manifest/');
-    const itemLitePath =
-      manifest.jsonWorldComponentContentPaths['en']?.['DestinyInventoryItemLiteDefinition'];
-    if (!itemLitePath) {
-      throw new BungieApiError('Manifest is missing English item definitions.');
+    const en = manifest.jsonWorldComponentContentPaths['en'];
+    const itemLitePath = en?.['DestinyInventoryItemLiteDefinition'];
+    const statDefPath = en?.['DestinyStatDefinition'];
+    if (!itemLitePath || !statDefPath) {
+      throw new BungieApiError('Manifest is missing English definitions.');
     }
-    return { version: manifest.version, itemLitePath };
+    return { version: manifest.version, itemLitePath, statDefPath };
   }
 
   private async request<T>(method: 'GET' | 'POST', path: string, body?: unknown): Promise<T> {

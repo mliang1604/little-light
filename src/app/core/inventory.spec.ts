@@ -1,11 +1,13 @@
-import { GEAR_BUCKETS, buildInventoryView, toItemView } from './inventory';
+import { GEAR_BUCKETS, buildInventoryView, buildItemDetail, toItemView } from './inventory';
 import type {
   DestinyCharacter,
   DestinyFullProfile,
   DestinyItemComponent,
   DestinyItemInstance,
+  DestinyItemSocketsComponent,
+  DestinyItemStatsComponent,
 } from './bungie';
-import type { ItemDefLite, ItemDefs } from './manifest.service';
+import type { ItemDefLite, ItemDefs, StatNames } from './manifest.service';
 
 const KINETIC = 1498876634;
 const HELMET = 3448274439;
@@ -51,6 +53,8 @@ function profile(parts: {
   inventories?: Record<string, DestinyItemComponent[]>;
   vault?: DestinyItemComponent[];
   instances?: Record<string, DestinyItemInstance>;
+  itemStats?: Record<string, DestinyItemStatsComponent>;
+  sockets?: Record<string, DestinyItemSocketsComponent>;
 }): DestinyFullProfile {
   const wrap = (record?: Record<string, DestinyItemComponent[]>) =>
     record
@@ -62,7 +66,11 @@ function profile(parts: {
     profileInventory: { data: parts.vault ? { items: parts.vault } : undefined },
     characterInventories: { data: wrap(parts.inventories) },
     characterEquipment: { data: wrap(parts.equipment) },
-    itemComponents: { instances: { data: parts.instances } },
+    itemComponents: {
+      instances: { data: parts.instances },
+      stats: { data: parts.itemStats },
+      sockets: { data: parts.sockets },
+    },
   };
 }
 
@@ -191,5 +199,78 @@ describe('buildInventoryView', () => {
     // Postmaster buckets must not leak into the gear rows.
     const kinetic = view.rows.find((r) => r.hash === KINETIC)!;
     expect(kinetic.perCharacter[0]!.stored).toEqual([]);
+  });
+});
+
+describe('buildItemDetail', () => {
+  const STAT_NAMES: StatNames = new Map([
+    [4284893193, 'Rounds Per Minute'],
+    [4043523819, 'Impact'],
+    [1240592695, 'Range'],
+    [3871231066, 'Magazine'],
+  ]);
+
+  const instanced = toItemView(item(2, KINETIC, 'i1'), DEFS, {});
+
+  it('maps and orders stats, with bars only for 0-100 gauges', () => {
+    const detail = buildItemDetail(
+      instanced,
+      profile({
+        itemStats: {
+          i1: {
+            stats: {
+              '1240592695': { statHash: 1240592695, value: 66 },
+              '3871231066': { statHash: 3871231066, value: 4 },
+              '4284893193': { statHash: 4284893193, value: 90 },
+              '4043523819': { statHash: 4043523819, value: 70 },
+            },
+          },
+        },
+      }),
+      DEFS,
+      STAT_NAMES,
+    );
+
+    expect(detail.stats.map((s) => s.name)).toEqual([
+      'Rounds Per Minute',
+      'Impact',
+      'Range',
+      'Magazine',
+    ]);
+    expect(detail.stats.find((s) => s.name === 'Range')!.barPercent).toBe(66);
+    // Absolute stats read as numbers, not gauges.
+    expect(detail.stats.find((s) => s.name === 'Rounds Per Minute')!.barPercent).toBeUndefined();
+    expect(detail.stats.find((s) => s.name === 'Magazine')!.barPercent).toBeUndefined();
+  });
+
+  it('resolves plugged sockets to names and icons, skipping hidden, empty, and disabled', () => {
+    const detail = buildItemDetail(
+      instanced,
+      profile({
+        sockets: {
+          i1: {
+            sockets: [
+              { plugHash: 1, isEnabled: true },
+              { plugHash: 2, isEnabled: true, isVisible: false },
+              { isEnabled: true },
+              { plugHash: 999, isEnabled: true },
+              { plugHash: 4, isEnabled: false },
+            ],
+          },
+        },
+      }),
+      DEFS,
+      STAT_NAMES,
+    );
+
+    expect(detail.plugs.map((p) => p.name)).toEqual(['Auto Low', '#999']);
+  });
+
+  it('returns empty sections for non-instanced items', () => {
+    const stackable = toItemView(item(5, VAULT, undefined, 40), DEFS, {});
+    const detail = buildItemDetail(stackable, profile({}), DEFS, STAT_NAMES);
+    expect(detail.stats).toEqual([]);
+    expect(detail.plugs).toEqual([]);
+    expect(detail.item.quantity).toBe(40);
   });
 });

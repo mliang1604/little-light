@@ -2,15 +2,22 @@ import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } 
 import { AuthService } from '../../core/auth.service';
 import { BungieApiService } from '../../core/bungie-api.service';
 import { ManifestService } from '../../core/manifest.service';
-import { ENGRAM_CAPACITY, POSTMASTER_CAPACITY, buildInventoryView } from '../../core/inventory';
+import {
+  ENGRAM_CAPACITY,
+  POSTMASTER_CAPACITY,
+  buildInventoryView,
+  buildItemDetail,
+} from '../../core/inventory';
 import { BUNGIE_ROOT, BungieApiError, CLASS_NAMES, pickPrimaryMembership } from '../../core/bungie';
 import type { DestinyCharacter, DestinyFullProfile } from '../../core/bungie';
-import type { InventoryView } from '../../core/inventory';
+import type { InventoryView, ItemDetailView, ItemView } from '../../core/inventory';
+import type { LoadedDefs } from '../../core/manifest.service';
+import { ItemDetail } from './item-detail';
 import { ItemTile } from './item-tile';
 
 @Component({
   selector: 'app-inventory-page',
-  imports: [ItemTile],
+  imports: [ItemTile, ItemDetail],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (!auth.isSignedIn()) {
@@ -84,7 +91,7 @@ import { ItemTile } from './item-tile';
                 </div>
                 <div class="postmaster-grid">
                   @for (lost of pm.lostItems; track lost.instanceId ?? $index) {
-                    <app-item-tile [item]="lost" />
+                    <app-item-tile [item]="lost" (selected)="openDetail($event)" />
                   }
                 </div>
               </div>
@@ -98,14 +105,14 @@ import { ItemTile } from './item-tile';
                   <div class="inv-bucket-row">
                     <div class="inv-equipped">
                       @if (cell.equipped; as equipped) {
-                        <app-item-tile [item]="equipped" />
+                        <app-item-tile [item]="equipped" (selected)="openDetail($event)" />
                       } @else {
                         <div class="tile tile-empty"></div>
                       }
                     </div>
                     <div class="inv-stored">
                       @for (stored of cell.stored; track stored.instanceId ?? $index) {
-                        <app-item-tile [item]="stored" />
+                        <app-item-tile [item]="stored" (selected)="openDetail($event)" />
                       }
                     </div>
                   </div>
@@ -117,7 +124,7 @@ import { ItemTile } from './item-tile';
                 </h3>
                 <div class="vault-grid">
                   @for (stored of row.vault; track stored.instanceId ?? $index) {
-                    <app-item-tile [item]="stored" />
+                    <app-item-tile [item]="stored" (selected)="openDetail($event)" />
                   }
                 </div>
               </div>
@@ -133,13 +140,16 @@ import { ItemTile } from './item-tile';
                 </h3>
                 <div class="vault-grid">
                   @for (stored of v.otherVault; track stored.instanceId ?? $index) {
-                    <app-item-tile [item]="stored" />
+                    <app-item-tile [item]="stored" (selected)="openDetail($event)" />
                   }
                 </div>
               </div>
             }
           </div>
         </div>
+      }
+      @if (selected(); as detail) {
+        <app-item-detail [detail]="detail" (closed)="selected.set(null)" />
       }
     }
   `,
@@ -156,6 +166,10 @@ export class InventoryPage implements OnInit {
   protected readonly loading = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly view = signal<InventoryView | null>(null);
+  protected readonly selected = signal<ItemDetailView | null>(null);
+
+  private defs: LoadedDefs | null = null;
+  private profileData: DestinyFullProfile | null = null;
 
   protected readonly downloadedMb = computed(() => {
     const state = this.manifest.state();
@@ -167,7 +181,9 @@ export class InventoryPage implements OnInit {
     this.loading.set(true);
     try {
       const [defs, full] = await Promise.all([this.manifest.load(), this.loadProfile()]);
-      this.view.set(buildInventoryView(full, defs));
+      this.defs = defs;
+      this.profileData = full;
+      this.view.set(buildInventoryView(full, defs.items));
     } catch (err) {
       if (err instanceof BungieApiError && err.status === 401) {
         this.auth.signOut();
@@ -180,6 +196,11 @@ export class InventoryPage implements OnInit {
     } finally {
       this.loading.set(false);
     }
+  }
+
+  protected openDetail(item: ItemView): void {
+    if (!this.defs || !this.profileData) return;
+    this.selected.set(buildItemDetail(item, this.profileData, this.defs.items, this.defs.statNames));
   }
 
   protected emblemUrl(character: DestinyCharacter): string {

@@ -14,6 +14,12 @@ export interface ItemDefLite {
 }
 
 export type ItemDefs = ReadonlyMap<number, ItemDefLite>;
+export type StatNames = ReadonlyMap<number, string>;
+
+export interface LoadedDefs {
+  readonly items: ItemDefs;
+  readonly statNames: StatNames;
+}
 
 export type ManifestState =
   | { readonly kind: 'idle' }
@@ -30,8 +36,13 @@ interface RawItemDef {
   readonly iconWatermark?: string;
 }
 
+interface RawStatDef {
+  readonly displayProperties?: { readonly name?: string };
+}
+
 const META_KEY = 'manifest-meta';
-const DEFS_KEY = 'item-defs';
+const ITEM_DEFS_KEY = 'item-defs';
+const STAT_DEFS_KEY = 'stat-defs';
 const PROGRESS_STEP_BYTES = 2 * 1024 * 1024;
 
 @Injectable({ providedIn: 'root' })
@@ -40,15 +51,15 @@ export class ManifestService {
 
   readonly state = signal<ManifestState>({ kind: 'idle' });
 
-  private defs: ItemDefs | null = null;
-  private inflight: Promise<ItemDefs> | null = null;
+  private loaded: LoadedDefs | null = null;
+  private inflight: Promise<LoadedDefs> | null = null;
 
-  /** Resolves the item-definition map, downloading and caching it if needed. */
-  load(): Promise<ItemDefs> {
-    if (this.defs) return Promise.resolve(this.defs);
+  /** Resolves the definition tables, downloading and caching them if needed. */
+  load(): Promise<LoadedDefs> {
+    if (this.loaded) return Promise.resolve(this.loaded);
     this.inflight ??= this.loadInner()
       .then((defs) => {
-        this.defs = defs;
+        this.loaded = defs;
         this.state.set({ kind: 'ready' });
         return defs;
       })
@@ -61,22 +72,31 @@ export class ManifestService {
     return this.inflight;
   }
 
-  private async loadInner(): Promise<ItemDefs> {
+  private async loadInner(): Promise<LoadedDefs> {
     this.state.set({ kind: 'checking' });
     const info = await this.api.getManifestInfo();
 
     const cachedMeta = await idbGet<{ version: string }>(META_KEY);
     if (cachedMeta?.version === info.version) {
-      const cached = await idbGet<Map<number, ItemDefLite>>(DEFS_KEY);
-      if (cached && cached.size > 0) return cached;
+      const [items, statNames] = await Promise.all([
+        idbGet<Map<number, ItemDefLite>>(ITEM_DEFS_KEY),
+        idbGet<Map<number, string>>(STAT_DEFS_KEY),
+      ]);
+      if (items && items.size > 0 && statNames && statNames.size > 0) {
+        return { items, statNames };
+      }
     }
 
-    const raw = await this.download(BUNGIE_ROOT + info.itemLitePath);
+    const statNames = trimStatDefs(await fetchJson<Record<string, RawStatDef>>(
+      BUNGIE_ROOT + info.statDefPath,
+    ));
+    const rawItems = await this.download(BUNGIE_ROOT + info.itemLitePath);
     this.state.set({ kind: 'processing' });
-    const defs = trimDefs(raw);
-    await idbSet(DEFS_KEY, defs);
+    const items = trimDefs(rawItems);
+    await idbSet(ITEM_DEFS_KEY, items);
+    await idbSet(STAT_DEFS_KEY, statNames);
     await idbSet(META_KEY, { version: info.version });
-    return defs;
+    return { items, statNames };
   }
 
   private async download(url: string): Promise<Record<string, RawItemDef>> {
@@ -108,6 +128,14 @@ export class ManifestService {
   }
 }
 
+async function fetchJson<T>(url: string): Promise<T> {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new BungieApiError(`Definition download failed (${response.status})`);
+  }
+  return (await response.json()) as T;
+}
+
 function trimDefs(raw: Readonly<Record<string, RawItemDef>>): ItemDefs {
   const map = new Map<number, ItemDefLite>();
   for (const [hash, def] of Object.entries(raw)) {
@@ -119,6 +147,15 @@ function trimDefs(raw: Readonly<Record<string, RawItemDef>>): ItemDefs {
       itemType: def.itemTypeDisplayName ?? '',
       watermark: def.iconWatermark,
     });
+  }
+  return map;
+}
+
+function trimStatDefs(raw: Readonly<Record<string, RawStatDef>>): StatNames {
+  const map = new Map<number, string>();
+  for (const [hash, def] of Object.entries(raw)) {
+    const name = def.displayProperties?.name;
+    if (name) map.set(Number(hash), name);
   }
   return map;
 }
