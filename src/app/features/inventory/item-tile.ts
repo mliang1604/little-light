@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
 import { BUNGIE_ROOT } from '../../core/bungie';
 import type { ItemView } from '../../core/inventory';
+import type { RollAssessment } from '../../core/rolls';
 
 /** A clicked item plus where its tile sits, so the detail popover can anchor to it. */
 export interface ItemSelection {
@@ -35,6 +36,16 @@ const MAX_GEAR_TIER = 5;
           }
         </span>
       }
+      @if (roll(); as r) {
+        @if (r.weapon.tier; as sheetTier) {
+          <span [class]="'tile-sheet-tier sheet-tier-' + sheetTier" aria-hidden="true">{{
+            sheetTier
+          }}</span>
+        }
+        @if (r.isGodRoll) {
+          <span class="tile-god" aria-hidden="true">★</span>
+        }
+      }
       @if (item().power; as power) {
         <span class="tile-badge">{{ power }}</span>
       } @else if (item().quantity > 1) {
@@ -45,6 +56,7 @@ const MAX_GEAR_TIER = 5;
 })
 export class ItemTile {
   readonly item = input.required<ItemView>();
+  readonly roll = input<RollAssessment | null>(null);
   readonly selected = output<ItemSelection>();
 
   protected readonly root = BUNGIE_ROOT;
@@ -63,6 +75,12 @@ export class ItemTile {
     const item = this.item();
     const power = item.power != null ? ` · ${item.power}` : '';
     const gearTier = item.gearTier != null ? ` · Tier ${item.gearTier}` : '';
-    return `${item.name} · ${item.itemType}${power}${gearTier}`;
+    const roll = this.roll();
+    const sheet = roll?.weapon.tier
+      ? ` · Sheet ${roll.weapon.tier}${roll.weapon.rank ? ' #' + roll.weapon.rank : ''}${
+          roll.isGodRoll ? ' · god roll' : ''
+        }`
+      : '';
+    return `${item.name} · ${item.itemType}${power}${gearTier}${sheet}`;
   });
 }

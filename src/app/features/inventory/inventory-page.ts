@@ -11,6 +11,7 @@ import { AccountService } from '../../core/account.service';
 import { AuthService } from '../../core/auth.service';
 import { BungieApiService } from '../../core/bungie-api.service';
 import { ManifestService } from '../../core/manifest.service';
+import { RollsService } from '../../core/rolls.service';
 import {
   ENGRAM_CAPACITY,
   POSTMASTER_CAPACITY,
@@ -26,18 +27,30 @@ import type {
 } from '../../core/bungie';
 import type { InventoryView, ItemDetailView, ItemView } from '../../core/inventory';
 import type { LoadedDefs } from '../../core/manifest.service';
+import type { RollAssessment } from '../../core/rolls';
 import { ItemDetail } from './item-detail';
 import type { PopoverPosition } from './item-detail';
 import { ItemTile } from './item-tile';
 import type { ItemSelection } from './item-tile';
+import { EMPTY_FILTERS, InventoryFilters, isEmptyFilter, matchesFilters } from './inventory-filters';
+import type { FilterFacets, InventoryFilterState } from './inventory-filters';
 
 /** Keep in sync with the .detail-panel width in styles.css. */
 const POPOVER_WIDTH = 340;
 const POPOVER_MARGIN = 8;
 
+const TIER_ORDER = ['S', 'A', 'B', 'C', 'D', 'E', 'F'];
+
+interface FilteredInventory {
+  readonly view: InventoryView;
+  readonly shown: number;
+  readonly total: number;
+  readonly active: boolean;
+}
+
 @Component({
   selector: 'app-inventory-page',
-  imports: [ItemTile, ItemDetail],
+  imports: [ItemTile, ItemDetail, InventoryFilters],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (!auth.isSignedIn()) {
@@ -74,10 +87,16 @@ const POPOVER_MARGIN = 8;
       @if (displayError(); as message) {
         <p class="error" role="alert">{{ message }}</p>
       }
-      @if (view(); as v) {
+      @if (filtered(); as f) {
+        <app-inventory-filters
+          [(state)]="filters"
+          [facets]="facets()"
+          [shown]="f.shown"
+          [total]="f.total"
+        />
         <div class="inv-workspace">
-          <div class="inv-grid" [style.--char-count]="v.characters.length || 1">
-            @for (c of v.characters; track c.characterId) {
+          <div class="inv-grid" [style.--char-count]="f.view.characters.length || 1">
+            @for (c of f.view.characters; track c.characterId) {
               <header class="inv-char-header" [style.background-image]="emblemUrl(c.character)">
                 <span class="inv-char-class">{{ classNames[c.character.classType] ?? '?' }}</span>
                 <span class="inv-char-light">✦ {{ c.character.light }}</span>
@@ -85,10 +104,10 @@ const POPOVER_MARGIN = 8;
             }
             <header class="inv-vault-header">
               <h2>Vault</h2>
-              <span class="inv-vault-count">{{ v.vaultTotal }}</span>
+              <span class="inv-vault-count">{{ f.view.vaultTotal }}</span>
             </header>
 
-            @for (pm of v.postmaster; track $index) {
+            @for (pm of f.view.postmaster; track $index) {
               <div class="inv-cell">
                 <h3 class="inv-label">
                   Postmaster
@@ -111,56 +130,78 @@ const POPOVER_MARGIN = 8;
                 </div>
                 <div class="postmaster-grid">
                   @for (lost of pm.lostItems; track lost.instanceId ?? $index) {
-                    <app-item-tile [item]="lost" (selected)="openDetail($event)" />
+                    <app-item-tile
+                      [item]="lost"
+                      [roll]="rollOf(lost)"
+                      (selected)="openDetail($event)"
+                    />
                   }
                 </div>
               </div>
             }
             <div class="inv-cell inv-vault-cell"></div>
 
-            @for (row of v.rows; track row.hash) {
+            @for (row of f.view.rows; track row.hash) {
               @for (cell of row.perCharacter; track $index) {
                 <div class="inv-cell">
                   <h3 class="inv-label">{{ row.label }}</h3>
                   <div class="inv-bucket-row">
                     <div class="inv-equipped">
                       @if (cell.equipped; as equipped) {
-                        <app-item-tile [item]="equipped" (selected)="openDetail($event)" />
+                        <app-item-tile
+                          [item]="equipped"
+                          [roll]="rollOf(equipped)"
+                          (selected)="openDetail($event)"
+                        />
                       } @else {
                         <div class="tile tile-empty"></div>
                       }
                     </div>
                     <div class="inv-stored">
                       @for (stored of cell.stored; track stored.instanceId ?? $index) {
-                        <app-item-tile [item]="stored" (selected)="openDetail($event)" />
+                        <app-item-tile
+                          [item]="stored"
+                          [roll]="rollOf(stored)"
+                          (selected)="openDetail($event)"
+                        />
                       }
                     </div>
                   </div>
                 </div>
               }
               <div class="inv-cell inv-vault-cell">
-                <h3 class="inv-label">
-                  {{ row.label }} <span class="inv-count">{{ row.vault.length }}</span>
-                </h3>
-                <div class="vault-grid">
-                  @for (stored of row.vault; track stored.instanceId ?? $index) {
-                    <app-item-tile [item]="stored" (selected)="openDetail($event)" />
-                  }
-                </div>
+                @if (row.vault.length > 0 || !f.active) {
+                  <h3 class="inv-label">
+                    {{ row.label }} <span class="inv-count">{{ row.vault.length }}</span>
+                  </h3>
+                  <div class="vault-grid">
+                    @for (stored of row.vault; track stored.instanceId ?? $index) {
+                      <app-item-tile
+                        [item]="stored"
+                        [roll]="rollOf(stored)"
+                        (selected)="openDetail($event)"
+                      />
+                    }
+                  </div>
+                }
               </div>
             }
 
-            @if (v.otherVault.length > 0) {
-              @for (c of v.characters; track c.characterId) {
+            @if (f.view.otherVault.length > 0) {
+              @for (c of f.view.characters; track c.characterId) {
                 <div class="inv-cell"></div>
               }
               <div class="inv-cell inv-vault-cell">
                 <h3 class="inv-label">
-                  Other <span class="inv-count">{{ v.otherVault.length }}</span>
+                  Other <span class="inv-count">{{ f.view.otherVault.length }}</span>
                 </h3>
                 <div class="vault-grid">
-                  @for (stored of v.otherVault; track stored.instanceId ?? $index) {
-                    <app-item-tile [item]="stored" (selected)="openDetail($event)" />
+                  @for (stored of f.view.otherVault; track stored.instanceId ?? $index) {
+                    <app-item-tile
+                      [item]="stored"
+                      [roll]="rollOf(stored)"
+                      (selected)="openDetail($event)"
+                    />
                   }
                 </div>
               </div>
@@ -169,7 +210,12 @@ const POPOVER_MARGIN = 8;
         </div>
       }
       @if (selected(); as s) {
-        <app-item-detail [detail]="s.detail" [position]="s.position" (closed)="selected.set(null)" />
+        <app-item-detail
+          [detail]="s.detail"
+          [position]="s.position"
+          [roll]="s.roll"
+          (closed)="selected.set(null)"
+        />
       }
     }
   `,
@@ -179,6 +225,7 @@ export class InventoryPage {
   protected readonly account = inject(AccountService);
   protected readonly manifest = inject(ManifestService);
   private readonly api = inject(BungieApiService);
+  private readonly rolls = inject(RollsService);
 
   protected readonly classNames = CLASS_NAMES;
   protected readonly root = BUNGIE_ROOT;
@@ -187,9 +234,11 @@ export class InventoryPage {
   protected readonly loading = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly view = signal<InventoryView | null>(null);
+  protected readonly filters = signal<InventoryFilterState>(EMPTY_FILTERS);
   protected readonly selected = signal<{
     detail: ItemDetailView;
     position: PopoverPosition;
+    roll: RollAssessment | null;
   } | null>(null);
 
   private defs: LoadedDefs | null = null;
@@ -202,6 +251,48 @@ export class InventoryPage {
   protected readonly downloadedMb = computed(() => {
     const state = this.manifest.state();
     return state.kind === 'downloading' ? state.receivedMb.toFixed(0) : '';
+  });
+
+  protected readonly facets = computed<FilterFacets>(() => {
+    this.rolls.state();
+    const analysis = this.rolls.analysis;
+    if (!analysis) return { tiers: [], types: [], sources: [] };
+    const tiers = TIER_ORDER.filter((tier) => analysis.weapons.some((w) => w.tier === tier));
+    const types = [...new Set(analysis.weapons.map((w) => w.type))];
+    const sources = [
+      ...new Set(analysis.weapons.map((w) => w.source).filter((s): s is string => !!s)),
+    ].sort((a, b) => a.localeCompare(b));
+    return { tiers, types, sources };
+  });
+
+  protected readonly filtered = computed<FilteredInventory | null>(() => {
+    const view = this.view();
+    if (!view) return null;
+    this.rolls.state();
+    const state = this.filters();
+    const active = !isEmptyFilter(state);
+    let total = 0;
+    let shown = 0;
+    const keep = (item: ItemView): boolean => {
+      total++;
+      const ok = !active || matchesFilters(item, this.rolls.assess(item), state);
+      if (ok) shown++;
+      return ok;
+    };
+    const rows = view.rows.map((row) => ({
+      ...row,
+      perCharacter: row.perCharacter.map((cell) => ({
+        equipped: cell.equipped && keep(cell.equipped) ? cell.equipped : undefined,
+        stored: cell.stored.filter(keep),
+      })),
+      vault: row.vault.filter(keep),
+    }));
+    const postmaster = view.postmaster.map((pm) => ({
+      engrams: pm.engrams,
+      lostItems: pm.lostItems.filter(keep),
+    }));
+    const otherVault = view.otherVault.filter(keep);
+    return { view: { ...view, rows, postmaster, otherVault }, shown, total, active };
   });
 
   constructor() {
@@ -218,31 +309,9 @@ export class InventoryPage {
     });
   }
 
-  private async load(membership: UserInfoCard): Promise<void> {
-    this.loading.set(true);
-    this.error.set(null);
-    this.view.set(null);
-    this.selected.set(null);
-    try {
-      const [defs, full] = await Promise.all([
-        this.manifest.load(),
-        this.api.getFullProfile(membership.membershipType, membership.membershipId),
-      ]);
-      this.defs = defs;
-      this.profileData = full;
-      this.view.set(buildInventoryView(full, defs.items));
-    } catch (err) {
-      if (err instanceof BungieApiError && err.status === 401) {
-        this.auth.signOut();
-        this.error.set('Your Bungie.net session expired — please sign in again.');
-      } else if (this.manifest.state().kind !== 'error') {
-        this.error.set(err instanceof Error ? err.message : 'Something went wrong.');
-      } else {
-        this.error.set(this.manifestErrorMessage());
-      }
-    } finally {
-      this.loading.set(false);
-    }
+  protected rollOf(item: ItemView): RollAssessment | null {
+    this.rolls.state();
+    return this.rolls.assess(item);
   }
 
   protected async openDetail(selection: ItemSelection): Promise<void> {
@@ -268,11 +337,42 @@ export class InventoryPage {
         defs.socketCategoryNames,
       ),
       position: popoverPosition(anchor),
+      roll: this.rolls.assess(item),
     });
   }
 
   protected emblemUrl(character: DestinyCharacter): string {
     return `url(${BUNGIE_ROOT}${character.emblemBackgroundPath})`;
+  }
+
+  private async load(membership: UserInfoCard): Promise<void> {
+    this.loading.set(true);
+    this.error.set(null);
+    this.view.set(null);
+    this.selected.set(null);
+    void this.rolls.load().catch(() => {
+      // Sheet data is an enhancement; the inventory still works without it.
+    });
+    try {
+      const [defs, full] = await Promise.all([
+        this.manifest.load(),
+        this.api.getFullProfile(membership.membershipType, membership.membershipId),
+      ]);
+      this.defs = defs;
+      this.profileData = full;
+      this.view.set(buildInventoryView(full, defs.items));
+    } catch (err) {
+      if (err instanceof BungieApiError && err.status === 401) {
+        this.auth.signOut();
+        this.error.set('Your Bungie.net session expired — please sign in again.');
+      } else if (this.manifest.state().kind !== 'error') {
+        this.error.set(err instanceof Error ? err.message : 'Something went wrong.');
+      } else {
+        this.error.set(this.manifestErrorMessage());
+      }
+    } finally {
+      this.loading.set(false);
+    }
   }
 
   private manifestErrorMessage(): string {

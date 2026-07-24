@@ -130,6 +130,15 @@ export const RACE_NAMES: Readonly<Record<number, string>> = {
   2: 'Exo',
 };
 
+export const DAMAGE_TYPE_NAMES: Readonly<Record<number, string>> = {
+  1: 'Kinetic',
+  2: 'Arc',
+  3: 'Solar',
+  4: 'Void',
+  6: 'Stasis',
+  7: 'Strand',
+};
+
 export const PLATFORM_NAMES: Readonly<Record<number, string>> = {
   1: 'Xbox',
   2: 'PlayStation',
