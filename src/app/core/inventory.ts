@@ -14,6 +14,7 @@ export interface ItemView {
   readonly watermark?: string;
   readonly tier: number;
   readonly power?: number;
+  readonly gearTier?: number;
   readonly quantity: number;
   readonly itemType: string;
 }
@@ -61,9 +62,7 @@ export function toItemView(
   instances: Instances,
 ): ItemView {
   const def = defs.get(item.itemHash) ?? FALLBACK_DEF;
-  const power = item.itemInstanceId
-    ? instances[item.itemInstanceId]?.primaryStat?.value
-    : undefined;
+  const instance = item.itemInstanceId ? instances[item.itemInstanceId] : undefined;
   return {
     itemHash: item.itemHash,
     instanceId: item.itemInstanceId,
@@ -71,7 +70,9 @@ export function toItemView(
     icon: def.icon,
     watermark: def.watermark,
     tier: def.tier,
-    power,
+    power: instance?.primaryStat?.value,
+    // 0 marks untiered legacy gear — treat it the same as absent.
+    gearTier: instance?.gearTier || undefined,
     quantity: item.quantity,
     itemType: def.itemType,
   };

@@ -2,6 +2,8 @@ import { ChangeDetectionStrategy, Component, computed, input } from '@angular/co
 import { BUNGIE_ROOT } from '../../core/bungie';
 import type { ItemView } from '../../core/inventory';
 
+const MAX_GEAR_TIER = 5;
+
 @Component({
   selector: 'app-item-tile',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -12,6 +14,13 @@ import type { ItemView } from '../../core/inventory';
       }
       @if (item().watermark; as watermark) {
         <img class="tile-watermark" [src]="root + watermark" alt="" loading="lazy" />
+      }
+      @if (pips().length > 0) {
+        <span class="tile-tiers" aria-hidden="true">
+          @for (pip of pips(); track $index) {
+            <i class="tile-pip"></i>
+          }
+        </span>
       }
       @if (item().power; as power) {
         <span class="tile-badge">{{ power }}</span>
@@ -26,9 +35,15 @@ export class ItemTile {
 
   protected readonly root = BUNGIE_ROOT;
 
+  protected readonly pips = computed(() => {
+    const gearTier = this.item().gearTier ?? 0;
+    return Array.from({ length: Math.min(gearTier, MAX_GEAR_TIER) }, (_, i) => i);
+  });
+
   protected readonly tooltip = computed(() => {
     const item = this.item();
     const power = item.power != null ? ` · ${item.power}` : '';
-    return `${item.name} · ${item.itemType}${power}`;
+    const gearTier = item.gearTier != null ? ` · Tier ${item.gearTier}` : '';
+    return `${item.name} · ${item.itemType}${power}${gearTier}`;
   });
 }

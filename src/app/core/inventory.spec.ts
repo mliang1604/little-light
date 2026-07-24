@@ -1,5 +1,10 @@
 import { buildCharacterColumns, buildVaultGroups, toItemView } from './inventory';
-import type { DestinyCharacter, DestinyFullProfile, DestinyItemComponent } from './bungie';
+import type {
+  DestinyCharacter,
+  DestinyFullProfile,
+  DestinyItemComponent,
+  DestinyItemInstance,
+} from './bungie';
 import type { ItemDefLite, ItemDefs } from './manifest.service';
 
 const KINETIC = 1498876634;
@@ -45,7 +50,7 @@ function profile(parts: {
   equipment?: Record<string, DestinyItemComponent[]>;
   inventories?: Record<string, DestinyItemComponent[]>;
   vault?: DestinyItemComponent[];
-  instances?: Record<string, { primaryStat?: { value: number } }>;
+  instances?: Record<string, DestinyItemInstance>;
 }): DestinyFullProfile {
   const wrap = (record?: Record<string, DestinyItemComponent[]>) =>
     record
@@ -72,6 +77,18 @@ describe('toItemView', () => {
   it('falls back gracefully for unknown definitions and stackables', () => {
     const view = toItemView(item(999, KINETIC, undefined, 25), DEFS, {});
     expect(view).toMatchObject({ name: 'Unknown item', tier: 0, power: undefined, quantity: 25 });
+  });
+
+  it('maps the Edge of Fate gear tier', () => {
+    const view = toItemView(item(2, KINETIC, 'inst-1'), DEFS, {
+      'inst-1': { primaryStat: { value: 500 }, gearTier: 5 },
+    });
+    expect(view.gearTier).toBe(5);
+  });
+
+  it('treats gearTier 0 (untiered legacy gear) as absent', () => {
+    const view = toItemView(item(2, KINETIC, 'inst-1'), DEFS, { 'inst-1': { gearTier: 0 } });
+    expect(view.gearTier).toBeUndefined();
   });
 });
 
