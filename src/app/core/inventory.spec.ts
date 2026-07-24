@@ -108,6 +108,25 @@ describe('toItemView', () => {
     const view = toItemView(item(2, KINETIC, 'inst-1'), DEFS, { 'inst-1': { gearTier: 0 } });
     expect(view.gearTier).toBeUndefined();
   });
+
+  it('collects per-socket option names from plugged and reusable plugs', () => {
+    const view = toItemView(
+      item(2, KINETIC, 'inst-1'),
+      DEFS,
+      {},
+      { 'inst-1': { sockets: [{ plugHash: 1, isEnabled: true }, { plugHash: 4, isEnabled: true }] } },
+      { 'inst-1': { plugs: { '0': [{ plugItemHash: 1 }, { plugItemHash: 3 }] } } },
+    );
+    expect(view.socketOptionNames).toEqual([
+      ['Auto Low', 'Zeta First'],
+      ['Helm'],
+    ]);
+  });
+
+  it('leaves socketOptionNames undefined without socket data', () => {
+    const view = toItemView(item(2, KINETIC, 'inst-1'), DEFS, {});
+    expect(view.socketOptionNames).toBeUndefined();
+  });
 });
 
 describe('buildInventoryView', () => {

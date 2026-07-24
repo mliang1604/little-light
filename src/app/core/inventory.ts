@@ -3,6 +3,8 @@ import type {
   DestinyFullProfile,
   DestinyItemComponent,
   DestinyItemInstance,
+  DestinyItemReusablePlugs,
+  DestinyItemSocketsComponent,
   SocketCategoryInfo,
 } from './bungie';
 import type { ItemDefLite, ItemDefs, StatNames } from './manifest.service';
@@ -18,6 +20,8 @@ export interface ItemView {
   readonly gearTier?: number;
   readonly quantity: number;
   readonly itemType: string;
+  /** Option names per socket (plugged + reusable), for roll matching and perk search. */
+  readonly socketOptionNames?: readonly (readonly string[])[];
 }
 
 export interface CharacterInfo {
@@ -77,10 +81,15 @@ const FALLBACK_DEF: ItemDefLite = { name: 'Unknown item', tier: 0, bucket: 0, it
 
 type Instances = Readonly<Record<string, DestinyItemInstance>>;
 
+type SocketsMap = Readonly<Record<string, DestinyItemSocketsComponent>>;
+type ReusableMap = Readonly<Record<string, DestinyItemReusablePlugs>>;
+
 export function toItemView(
   item: DestinyItemComponent,
   defs: ItemDefs,
   instances: Instances,
+  socketsMap?: SocketsMap,
+  reusableMap?: ReusableMap,
 ): ItemView {
   const def = defs.get(item.itemHash) ?? FALLBACK_DEF;
   const instance = item.itemInstanceId ? instances[item.itemInstanceId] : undefined;
@@ -96,7 +105,41 @@ export function toItemView(
     gearTier: instance?.gearTier || undefined,
     quantity: item.quantity,
     itemType: def.itemType,
+    socketOptionNames: buildSocketOptionNames(item.itemInstanceId, defs, socketsMap, reusableMap),
   };
+}
+
+function buildSocketOptionNames(
+  instanceId: string | undefined,
+  defs: ItemDefs,
+  socketsMap?: SocketsMap,
+  reusableMap?: ReusableMap,
+): readonly (readonly string[])[] | undefined {
+  if (!instanceId || (!socketsMap && !reusableMap)) return undefined;
+  const sockets = socketsMap?.[instanceId]?.sockets ?? [];
+  const reusable = reusableMap?.[instanceId]?.plugs ?? {};
+  const socketCount = Math.max(
+    sockets.length,
+    ...Object.keys(reusable).map((key) => Number(key) + 1),
+    0,
+  );
+  if (socketCount === 0) return undefined;
+
+  const columns: (readonly string[])[] = [];
+  for (let index = 0; index < socketCount; index++) {
+    const names = new Set<string>();
+    const plugged = sockets[index]?.plugHash;
+    if (plugged != null) {
+      const def = defs.get(plugged);
+      if (def) names.add(def.name);
+    }
+    for (const option of reusable[String(index)] ?? []) {
+      const def = defs.get(option.plugItemHash);
+      if (def) names.add(def.name);
+    }
+    columns.push([...names]);
+  }
+  return columns;
 }
 
 function byPowerThenName(a: ItemView, b: ItemView): number {
@@ -250,6 +293,10 @@ export function buildInventoryView(profile: DestinyFullProfile, defs: ItemDefs):
   const instances = profile.itemComponents.instances.data ?? {};
   const equipment = profile.characterEquipment.data ?? {};
   const inventories = profile.characterInventories.data ?? {};
+  const socketsMap = profile.itemComponents.sockets?.data;
+  const reusableMap = profile.itemComponents.reusablePlugs?.data;
+  const view = (item: DestinyItemComponent) =>
+    toItemView(item, defs, instances, socketsMap, reusableMap);
 
   const characters: CharacterInfo[] = Object.entries(profile.characters.data ?? {})
     .sort(([, a], [, b]) => Date.parse(b.dateLastPlayed) - Date.parse(a.dateLastPlayed))
@@ -261,8 +308,7 @@ export function buildInventoryView(profile: DestinyFullProfile, defs: ItemDefs):
   const vaultByBucket = new Map<number, ItemView[]>(GEAR_BUCKETS.map(({ hash }) => [hash, []]));
   const otherVault: ItemView[] = [];
   for (const item of vaultItems) {
-    const view = toItemView(item, defs, instances);
-    (vaultByBucket.get(defs.get(item.itemHash)?.bucket ?? 0) ?? otherVault).push(view);
+    (vaultByBucket.get(defs.get(item.itemHash)?.bucket ?? 0) ?? otherVault).push(view(item));
   }
 
   const rows: BucketRow[] = GEAR_BUCKETS.map(({ hash, label }) => ({
@@ -274,10 +320,10 @@ export function buildInventoryView(profile: DestinyFullProfile, defs: ItemDefs):
       );
       const stored = (inventories[characterId]?.items ?? [])
         .filter((i) => i.bucketHash === hash)
-        .map((i) => toItemView(i, defs, instances))
+        .map(view)
         .sort(byPowerThenName);
       return {
-        equipped: equippedItem ? toItemView(equippedItem, defs, instances) : undefined,
+        equipped: equippedItem ? view(equippedItem) : undefined,
         stored,
       };
     }),
@@ -287,12 +333,8 @@ export function buildInventoryView(profile: DestinyFullProfile, defs: ItemDefs):
   const postmaster: PostmasterCell[] = characters.map(({ characterId }) => {
     const items = inventories[characterId]?.items ?? [];
     return {
-      engrams: items
-        .filter((i) => i.bucketHash === ENGRAM_BUCKET)
-        .map((i) => toItemView(i, defs, instances)),
-      lostItems: items
-        .filter((i) => i.bucketHash === POSTMASTER_BUCKET)
-        .map((i) => toItemView(i, defs, instances)),
+      engrams: items.filter((i) => i.bucketHash === ENGRAM_BUCKET).map(view),
+      lostItems: items.filter((i) => i.bucketHash === POSTMASTER_BUCKET).map(view),
     };
   });
 
