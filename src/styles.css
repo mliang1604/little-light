@@ -595,6 +595,47 @@ button[type='submit']:disabled {
 
 app-item-tile {
   display: block;
+  position: relative;
+}
+
+/* Perfect roll (god roll + recommended barrel and mag): pulsing gold glow.
+   Animates only opacity on a compositor layer — never per-frame shadows. */
+app-item-tile.perfect-roll::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-sm);
+  box-shadow: 0 0 10px 2px rgb(242 205 78 / 0.55);
+  opacity: 0.35;
+  animation: glow-pulse 2.4s ease-in-out infinite;
+  pointer-events: none;
+}
+
+app-item-tile.perfect-roll .tile {
+  border-color: rgb(242 205 78 / 0.95);
+}
+
+app-item-tile.perfect-roll .tile-god {
+  text-shadow: 0 0 6px rgb(242 205 78 / 0.95);
+  animation: glow-pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes glow-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  app-item-tile.perfect-roll::after,
+  app-item-tile.perfect-roll .tile-god {
+    animation: none;
+    opacity: 0.8;
+  }
 }
 
 .tile {
@@ -1088,6 +1129,20 @@ app-item-tile {
   font-size: 0.8rem;
   color: var(--text-dim);
   white-space: pre-line;
+}
+
+.plug-sheet {
+  margin: 0 0 0.2rem;
+  font-size: 0.8rem;
+}
+
+.plug-sheet-tags {
+  color: var(--text-dim);
+}
+
+.plug-popover .plug-sheet-notes {
+  margin: 0 0 0.35rem;
+  font-style: italic;
 }
 
 .plug img {

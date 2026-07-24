@@ -1,5 +1,5 @@
-import { buildSheetIndex, evaluateRoll, normalizeName } from './rolls';
-import type { SheetWeapon, SheetWeaponColumns } from './rolls';
+import { buildPerkIndex, buildSheetIndex, evaluateRoll, normalizeName } from './rolls';
+import type { SheetPerk, SheetWeapon, SheetWeaponColumns } from './rolls';
 
 function columns(overrides: Partial<SheetWeaponColumns>): SheetWeaponColumns {
   return { barrel: [], mag: [], perk1: [], perk2: [], origin: [], ...overrides };
@@ -105,5 +105,45 @@ describe('evaluateRoll', () => {
     const result = evaluateRoll(undefined, sheet);
     expect(result.isGodRoll).toBe(false);
     expect(result.perk1Match).toBe(false);
+  });
+
+  it('flags a perfect roll when barrel and mag also match; origin trait is optional', () => {
+    const full = evaluateRoll(
+      [['Fluted Barrel'], ['Alloy Magazine'], ['Repulsor Brace'], ['Destabilizing Rounds']],
+      sheet,
+    );
+    expect(full.isPerfectRoll).toBe(true);
+    expect(full.originMatch).toBe(false);
+  });
+
+  it('is not perfect when a recommended barrel or mag is missing', () => {
+    const noBarrel = evaluateRoll(
+      [['Corkscrew Rifling'], ['Alloy Magazine'], ['Repulsor Brace'], ['Destabilizing Rounds']],
+      sheet,
+    );
+    expect(noBarrel.isGodRoll).toBe(true);
+    expect(noBarrel.isPerfectRoll).toBe(false);
+  });
+
+  it('treats empty barrel/mag recommendations as satisfied for perfection', () => {
+    const traitsOnly = weapon({
+      columns: columns({ perk1: ['Repulsor Brace'], perk2: ['Destabilizing Rounds'] }),
+    });
+    const result = evaluateRoll([['Repulsor Brace'], ['Destabilizing Rounds']], traitsOnly);
+    expect(result.isPerfectRoll).toBe(true);
+  });
+});
+
+describe('buildPerkIndex', () => {
+  it('indexes perk ratings by normalized name', () => {
+    const perk: SheetPerk = {
+      name: "Fourth Time's the Charm",
+      tags: ['overflow', 'ammo'],
+      description: 'nearly doubles total damage',
+      rank: 4,
+      tier: 'S',
+    };
+    const index = buildPerkIndex([perk]);
+    expect(index.get(normalizeName('Fourth Time’s The Charm'))).toBe(perk);
   });
 });
